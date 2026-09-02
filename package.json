@@ -1,0 +1,18 @@
+{
+  "name": "nothingbutbbs-papenburg",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Stundenplan-PWA der BBS Papenburg als Android-Hülle (Capacitor). Die Web-App selbst braucht keinen Build-Schritt; dieser existiert nur, um daraus eine installierbare APK zu erzeugen.",
+  "scripts": {
+    "android:add": "cap add android",
+    "android:sync": "cap sync android",
+    "android:open": "cap open android"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.2.0"
+  },
+  "dependencies": {
+    "@capacitor/core": "^6.2.0",
+    "@capacitor/android": "^6.2.0"
+  }
+}

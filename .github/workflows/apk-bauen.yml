@@ -1,0 +1,52 @@
+# Baut die APK aus der Web-App. Die App selbst braucht keinen Build-Schritt
+# (Regel aus CLAUDE.md) — dieser Workflow existiert nur, um daraus zusätzlich
+# eine installierbare Android-Hülle zu erzeugen. android/ wird bei jedem Lauf
+# frisch von Capacitor erzeugt, nie committet (siehe .gitignore).
+name: APK bauen
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  pruefen:
+    uses: ./.github/workflows/pruefen.yml
+
+  apk:
+    needs: pruefen
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Web-Dateien zusammenstellen (dieselbe Liste wie sw.js)
+        run: node werkzeug/seite-bauen.mjs www
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Capacitor-Abhängigkeiten installieren
+        run: npm install --no-fund --no-audit
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Android-SDK einrichten
+        uses: android-actions/setup-android@v3
+
+      - name: Android-Projekt aus der Web-App erzeugen
+        run: npx cap add android && npx cap sync android
+
+      - name: APK bauen (unsigniert, Debug)
+        working-directory: android
+        run: ./gradlew assembleDebug
+
+      - name: APK als Artefakt bereitstellen
+        uses: actions/upload-artifact@v4
+        with:
+          name: stundenplan-bbs-papenburg-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30

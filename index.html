@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<!-- Die App lädt nichts von fremden Servern. Was sie nicht braucht, darf sie
+     auch nicht können — das begrenzt den Schaden, falls doch einmal fremder
+     Text in einer eingelesenen Sicherung durchrutscht. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' blob:;
+  script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:;
+  connect-src 'self' https://openholidaysapi.org; base-uri 'none'; form-action 'none';
+  object-src 'none'">
+<title>Stundenplan BBS Papenburg</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0a0a0a">
+<!-- Beim Abruf der Ferientermine soll openholidaysapi.org nicht erfahren,
+     von welcher Seite die Anfrage kommt. -->
+<meta name="referrer" content="no-referrer">
+<link rel="icon" href="icon-192.png">
+<style>
+:root{
+  --akzent:#e5382b;
+  --ink:#0a0a0a; --surface:#141414; --line:#262626; --line2:#1a1a1a;
+  --text:#ededed; --muted:#7a7a7a; --dim:#3a3a3a;
+  --red:var(--akzent);
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+body.hell{
+  --ink:#f7f7f5; --surface:#fff; --line:#dcdcd8; --line2:#ebebe7;
+  --text:#141414; --muted:#6b6b66; --dim:#b8b8b2;
+}
+body.schrift-mono{ --sans:var(--mono) }
+body.schrift-serif{ --sans:ui-serif,Georgia,"Times New Roman",serif }
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--ink);color:var(--text);font-family:var(--sans);
+  -webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{padding:14px 16px 158px;max-width:640px;margin:0 auto;
+  display:flex;flex-direction:column;min-height:100dvh}
+/* Fängt jede Wischgeste unterhalb des Inhalts ab und wechselt die Ansicht. */
+#leerraum{flex:1 0 48px;touch-action:pan-y}
+/* Langes Drücken ist hier eine Geste der App. Ohne diese Zeilen legt iOS
+   sein eigenes Auswahlmenü darüber und markiert den Text im Knopf. */
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;
+  -webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+:focus-visible{outline:2px solid var(--akzent);outline-offset:2px}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
+.hidden{display:none !important}
+.mitte{text-align:center}
+
+/* Kopf */
+.top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:14px}
+.reiter{display:flex;gap:2px;border:1px solid var(--line);border-radius:99px;padding:3px;flex:1;min-width:0}
+.reiter button{font-family:var(--mono);font-size:10.5px;letter-spacing:.02em;text-transform:uppercase;
+  padding:7px 2px;border-radius:99px;color:var(--muted);flex:1}
+.reiter button[aria-pressed=true]{background:var(--text);color:var(--ink)}
+.ikon{border:1px solid var(--line);border-radius:10px;width:36px;height:36px;font-size:14px;color:var(--muted);flex:none}
+.ikon[aria-pressed=true]{border-color:var(--akzent);color:var(--akzent)}
+/* Der Stift gehört nur zur Tagesansicht. Verschwände er ganz, würde die
+   Reiterleiste bei jedem Ansichtswechsel um seine Breite springen. */
+#btnEdit.hidden{display:block !important;visibility:hidden;pointer-events:none}
+header h1{font-size:29px;line-height:1;letter-spacing:-.02em;margin:5px 0 0;font-weight:600}
+header h1 span{color:var(--muted);font-weight:400}
+.countdown{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.06em;margin-top:8px}
+.kw{display:flex;align-items:center;gap:8px;margin-top:10px}
+.kw button{font-family:var(--mono);font-size:14px;border:1px solid var(--line);border-radius:9px;
+  width:34px;height:32px;color:var(--muted)}
+.kw .label{font-family:var(--mono);font-size:11px;letter-spacing:.12em;color:var(--muted);text-transform:uppercase}
+.ab{font-family:var(--mono);font-size:11px;border:1px solid var(--akzent);color:var(--akzent);
+  border-radius:99px;padding:2px 8px;letter-spacing:.1em}
+
+/* Fortschritt */
+.fortschritt{margin:16px 0 4px}
+.balken{height:2px;background:var(--line2);position:relative;overflow:hidden}
+.balken i{position:absolute;inset:0 auto 0 0;background:var(--akzent);width:0}
+.fortschritt .zeile{display:flex;justify-content:space-between;margin-top:7px;
+  font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.06em}
+.fortschritt .zeile b{color:var(--text);font-weight:500}
+
+/* Tage */
+.tage{display:grid;grid-template-columns:repeat(5,1fr) .62fr;gap:5px;margin:18px 0 4px}
+.tage button{font-family:var(--mono);font-size:12px;padding:9px 0;border:1px solid var(--line);
+  border-radius:10px;color:var(--muted)}
+.tage button[aria-pressed=true]{background:var(--text);color:var(--ink);border-color:var(--text)}
+.punkt{display:block;width:4px;height:4px;border-radius:99px;background:var(--akzent);margin:5px auto 0}
+
+/* Blöcke */
+.frei-banner{border:1px solid var(--akzent);border-radius:12px;padding:12px 14px;margin:16px 0 0}
+.frei-banner b{color:var(--akzent);font-size:15px}
+.frei-banner div{font-family:var(--mono);font-size:11.5px;color:var(--muted);margin-top:3px}
+.frei-banner .chips button{color:var(--text);border-color:var(--akzent)}
+.block{display:grid;grid-template-columns:58px 1fr;gap:14px;align-items:start;
+  border-top:1px solid var(--line);padding:15px 0;width:100%;text-align:left}
+#plan .block:last-child{border-bottom:1px solid var(--line)}
+.block.jetzt{background:linear-gradient(90deg,color-mix(in srgb,var(--akzent) 12%,transparent),transparent 65%);
+  border-left:2px solid var(--akzent);padding-left:10px;margin-left:-12px}
+.block.jetzt .fach,.block.jetzt .zeit b{color:var(--akzent)}
+.block.ausfall .fach{color:var(--dim);text-decoration:line-through}
+.zeit{font-family:var(--mono);font-size:12.5px;color:var(--muted);line-height:1.55;padding-top:2px}
+.zeit b{display:block;color:var(--text);font-weight:500}
+.fach{font-size:18.5px;letter-spacing:-.01em}
+.fach.leer{color:var(--dim)}
+.detail{font-family:var(--mono);font-size:11.5px;color:var(--muted);margin-top:4px;letter-spacing:.04em}
+.durch{text-decoration:line-through;color:var(--dim)}
+.marker{display:flex;gap:5px;margin-top:8px;flex-wrap:wrap}
+.schluss{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--dim);border-top:1px solid var(--line);padding:12px 0 0;margin-top:0}
+.jetztlinie{display:flex;align-items:center;gap:9px}
+.jetztlinie::after{content:"";flex:1;height:1px;background:var(--akzent)}
+.jetztlinie span{font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--akzent)}
+
+.khn{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.06em;
+  border:1px solid var(--akzent);color:var(--akzent);border-radius:4px;padding:1px 5px;line-height:1.5}
+.khn.aus{border-color:var(--dim);color:var(--dim)}
+.einmalig{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;
+  border:1px dashed var(--muted);color:var(--muted);border-radius:2px;padding:1px 5px}
+
+/* Listen */
+section{margin-top:30px}
+.liste{list-style:none;padding:0;margin:10px 0 0}
+.liste li{display:flex;gap:11px;align-items:flex-start;padding:12px 0;border-top:1px solid var(--line)}
+.liste .kopf{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.liste .titel{font-size:15px}
+.liste .weg .titel{color:var(--muted);text-decoration:line-through}
+.liste .notiz{font-size:13px;color:var(--muted);margin-top:3px;white-space:pre-wrap}
+.wann{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.06em;margin-top:3px}
+.hak{-webkit-appearance:none;appearance:none;width:18px;height:18px;border:1px solid var(--line);border-radius:5px;margin:2px 0 0;flex:none}
+.hak:checked{background:var(--text);border-color:var(--text)}
+.wachs{flex:1;min-width:0}
+.nix{color:var(--muted);font-size:14px;margin:12px 0 0}
+.mini{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;
+  border:1px solid var(--line);border-radius:8px;padding:6px 9px;color:var(--muted)}
+.we-teil{border-top:1px solid var(--line);padding:14px 0}
+#toast{position:fixed;left:50%;transform:translateX(-50%);z-index:60;
+  bottom:calc(150px + env(safe-area-inset-bottom));background:var(--surface);
+  border:1px solid var(--akzent);border-radius:11px;padding:11px 15px;
+  font-family:var(--mono);font-size:11.5px;line-height:1.5;color:var(--text);
+  max-width:min(90vw,420px);text-align:center;word-break:break-word}
+
+/* Kalender */
+/* Drei gleich gewichtete Spalten: der Titel steht damit wirklich in der
+   Mitte und nicht dort, wo die Knöpfe rechts zufällig Platz lassen. */
+.monat{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;margin-bottom:12px}
+.monat .mLinks{display:flex;gap:8px;justify-content:flex-start}
+.monat .mRechts{display:flex;gap:8px;justify-content:flex-end}
+.monat b{text-align:center;white-space:nowrap}
+.monat b{font-size:18px;font-weight:600}
+.monat.klein{margin-bottom:8px}
+.monat.klein b{font-size:14px}
+.monat.klein .ikon{width:30px;height:30px;font-size:13px}
+.gitter{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.gitter .wt{font-family:var(--mono);font-size:10px;color:var(--muted);text-align:center;padding:4px 0;letter-spacing:.1em}
+.tagfeld{aspect-ratio:1;border:1px solid transparent;border-radius:9px;display:flex;
+  flex-direction:column;align-items:center;justify-content:center;gap:2px;font-family:var(--mono);font-size:13px}
+.tagfeld.fremd{color:var(--dim)}
+.tagfeld.heute{border-color:var(--akzent)}
+.tagfeld.ferien{background:var(--line2)}
+.tagfeld[aria-pressed=true]{background:var(--text);color:var(--ink)}
+.tagfeld .zeichen{display:flex;gap:3px;align-items:center;font-size:9px;font-weight:700;color:var(--akzent);line-height:1}
+.tagfeld[aria-pressed=true] .zeichen{color:var(--ink)}
+.punktfach{width:5px;height:5px;border-radius:99px;background:var(--akzent);flex:none}
+.quadratfach{width:5px;height:5px;border-radius:1px;background:var(--akzent);flex:none}
+.tagfeld[aria-pressed=true] .punktfach,.tagfeld[aria-pressed=true] .quadratfach{background:var(--ink)}
+
+/* Noten und Zeugnis */
+.notenkarte{border-top:1px solid var(--line);padding:14px 0}
+.notenkarte .kopfz{display:flex;align-items:baseline;gap:10px}
+.notenkarte .schnitt{font-size:22px;font-weight:600;margin-left:auto}
+.notenkarte .teil{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:4px}
+.notenchips{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.notenchips button{font-family:var(--mono);font-size:11.5px;border:1px solid var(--line);
+  border-radius:8px;padding:6px 9px;color:var(--text)}
+.anteilchip{font-family:var(--mono);font-size:10.5px;border:1px solid var(--line);
+  border-radius:99px;padding:4px 9px;color:var(--muted)}
+.notenzeile{display:flex;align-items:baseline;gap:11px;padding:9px 0;border-top:1px solid var(--line2)}
+.notenzeile .wert{font-family:var(--mono);font-size:15px;font-weight:600;min-width:38px}
+.notenzeile .art{font-family:var(--mono);font-size:10px;color:var(--muted);
+  border:1px solid var(--line);border-radius:4px;padding:1px 5px}
+.notenzeile .wofuer{flex:1;min-width:0;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.notenzeile .tag{font-family:var(--mono);font-size:10.5px;color:var(--muted)}
+.zeuZeile{display:flex;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--line);width:100%;text-align:left}
+.zeuZeile .fachn{flex:1;min-width:0}
+.zeuZeile .fachn small{display:block;font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-top:3px}
+.zeuZeile .roh{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.zeuZeile .note{font-size:26px;font-weight:600;min-width:44px;text-align:right}
+#zeuSchnitt{color:var(--akzent)}
+
+/* Merkblätter */
+.merkzeile{display:block;width:100%;text-align:center;padding:16px 0;border-top:1px solid var(--line)}
+.merkzeile .mtitel{font-size:16px}
+.merkzeile .mstand{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-top:4px}
+.merkschau{white-space:pre-wrap;font-family:var(--mono);font-size:12.5px;line-height:1.7;
+  margin-top:14px;text-align:left}
+.bilder{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;margin-top:14px}
+.bilder img{width:100%;border-radius:10px;border:1px solid var(--line);display:block}
+.bildweg{position:relative}
+.bildweg button{position:absolute;top:5px;right:5px;background:var(--ink);border:1px solid var(--akzent);
+  color:var(--akzent);border-radius:8px;width:26px;height:26px;font-size:13px}
+
+/* Fuß */
+#fuss{position:fixed;left:0;right:0;bottom:0;z-index:5;background:var(--ink);
+  border-top:1px solid var(--line2);touch-action:pan-y;
+  padding:12px 16px calc(8px + env(safe-area-inset-bottom))}
+#fuss > *{max-width:608px;margin-left:auto;margin-right:auto}
+/* display:block, damit margin:auto oben greift — ein <button> ist von Haus
+   aus inline-block und liesse sich davon nicht zentrieren. */
+.gross{display:block;width:100%;background:var(--text);color:var(--ink);border-radius:14px;
+  padding:17px;font-family:var(--mono);font-size:13px;letter-spacing:.12em;text-transform:uppercase;font-weight:600}
+.wischzone{margin-top:10px;padding:6px 0 2px;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:7px;touch-action:pan-y}
+.wischzone span{font-family:var(--mono);font-size:10px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--dim)}
+.punkte{display:flex;gap:7px}
+.punkte i{width:6px;height:6px;border-radius:99px;background:var(--line)}
+.punkte i.an{background:var(--akzent)}
+
+/* Profilauswahl */
+#profilStart{position:fixed;inset:0;z-index:20;background:var(--ink);
+  display:flex;align-items:center;justify-content:center;
+  padding:32px 20px calc(32px + env(safe-area-inset-bottom));overflow-y:auto}
+.pInhalt{width:100%;max-width:520px}
+.pKopf{margin-bottom:32px}
+.pKopf h1{font-size:32px;line-height:1.05;letter-spacing:-.02em;margin:8px 0 0;font-weight:600}
+.pGitter{display:grid;grid-template-columns:repeat(auto-fill,minmax(116px,1fr));gap:14px}
+.kachel{text-align:left}
+.kachel .feld{aspect-ratio:1;border:1px solid var(--line);border-radius:16px;
+  display:flex;align-items:center;justify-content:center;overflow:hidden;
+  background-image:radial-gradient(var(--line) 1px,transparent 1px);background-size:11px 11px}
+.kachel .feld span{font-family:var(--mono);font-size:40px;font-weight:600;color:var(--text);
+  background:var(--ink);padding:0 12px;line-height:1.15}
+.kachel[aria-current=true] .feld{border-color:var(--akzent)}
+.kachel[aria-current=true] .feld span{color:var(--akzent)}
+.kachel .kname{font-size:15px;margin-top:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kachel .knum{font-family:var(--mono);font-size:10px;letter-spacing:.16em;color:var(--dim);margin-top:2px}
+.kachel.neu .feld{border-style:dashed;background-image:none}
+.kachel.neu .feld span{font-size:30px;color:var(--muted)}
+.kwerkzeug{display:flex;gap:6px;margin-top:8px}
+.kwerkzeug button{flex:1;font-family:var(--mono);font-size:10.5px;border:1px solid var(--line);
+  border-radius:8px;padding:6px 0;color:var(--muted)}
+.kwerkzeug .loesch{border-color:var(--akzent);color:var(--akzent);flex:0 0 34px}
+.pFuss{display:flex;gap:8px;margin-top:32px}
+
+/* Anleitung */
+/* display nur im geöffneten Zustand: ein pauschales display:flex hebt das
+   display:none auf, das ein geschlossener dialog vom Browser bekommt — der
+   Dialog läge dann unsichtbar über der App und schluckte jeden Klick. */
+#dlgHilfe{width:min(96vw,720px);max-height:92vh;padding:0}
+#dlgHilfe[open]{display:flex;flex-direction:column}
+.hKopf{padding:18px 20px 12px;border-bottom:1px solid var(--line);flex:none}
+.hKopf h2{margin:0 0 10px}
+.hKopf input{margin-top:0}
+#hilfeStand{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:8px;letter-spacing:.06em}
+#hilfeKoerper{overflow-y:auto;padding:0 20px 8px;flex:1;overscroll-behavior:contain}
+#hilfeVerzeichnis{margin:16px 0 4px;border:1px solid var(--line);border-radius:12px;padding:14px}
+.hvTeil{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--akzent);margin:12px 0 4px}
+#hilfeVerzeichnis .eyebrow{margin-bottom:4px}
+.hvZeile{display:block;width:100%;text-align:left;padding:7px 0;font-size:14.5px;
+  border-bottom:1px solid var(--line2)}
+.hTeil{margin:30px 0 2px;color:var(--akzent)}
+.hAbschnitt{padding:14px 0 4px;border-top:1px solid var(--line);scroll-margin-top:8px}
+.hAbschnitt h3{font-size:17px;margin:0 0 8px;font-weight:600;letter-spacing:-.01em}
+.hAbschnitt p{margin:9px 0;font-size:14.5px;line-height:1.6}
+.hAbschnitt ul,.hAbschnitt ol{margin:9px 0;padding-left:20px;font-size:14.5px;line-height:1.6}
+.hAbschnitt li{margin:5px 0}
+.hAbschnitt code{font-family:var(--mono);font-size:12.5px;background:var(--line2);
+  border-radius:4px;padding:1px 5px}
+.hCode{font-family:var(--mono);font-size:12.5px;background:var(--line2);border-radius:9px;
+  padding:11px 13px;overflow-x:auto;white-space:pre;line-height:1.55;margin:10px 0}
+.hTab{width:100%;border-collapse:collapse;margin:10px 0;font-size:13.5px}
+.hTab th{text-align:left;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--muted);font-weight:400;padding:6px 8px 6px 0;
+  border-bottom:1px solid var(--line)}
+.hTab td{padding:7px 8px 7px 0;border-bottom:1px solid var(--line2);vertical-align:top;line-height:1.5}
+.hWarn{border-left:2px solid var(--akzent);padding-left:12px}
+.hHinweis{border-left:2px solid var(--line);padding-left:12px;color:var(--muted)}
+.hAbschnitt mark{background:var(--akzent);color:#fff;border-radius:3px;padding:0 2px}
+#dlgHilfe .reihe{margin:0;padding:12px 20px calc(14px + env(safe-area-inset-bottom));
+  border-top:1px solid var(--line);flex:none}
+
+/* Dialoge */
+dialog{background:var(--surface);color:var(--text);border:1px solid var(--line);border-radius:16px;
+  padding:20px;width:min(93vw,440px);max-height:86vh}
+dialog::backdrop{background:#000c}
+dialog h2{font-size:17px;margin:0 0 3px;font-weight:600}
+label{display:block;margin-top:14px}
+label span{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+input,select,textarea{width:100%;margin-top:6px;background:var(--ink);color:var(--text);
+  border:1px solid var(--line);border-radius:10px;padding:11px;font:inherit}
+input[type=color]{padding:4px;height:46px}
+/* Unter 16 px zoomt Safari auf dem iPhone beim Antippen in die Seite hinein
+   und wieder heraus kommt man nicht. Deshalb bleibt jedes Eingabefeld bei 16. */
+textarea{min-height:120px;font-family:var(--mono);font-size:16px}
+.zwei{display:flex;gap:10px}
+.zwei label{flex:1}
+.reihe{display:flex;gap:9px;margin-top:20px}
+.reihe button{flex:1;border:1px solid var(--line);border-radius:10px;padding:12px;
+  font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase}
+.reihe .haupt{background:var(--text);color:var(--ink);border-color:var(--text)}
+.reihe .weg{border-color:var(--akzent);color:var(--akzent);flex:0 0 54px}
+.stapel{display:flex;flex-direction:column;gap:9px;margin-top:18px}
+.stapel button{border:1px solid var(--line);border-radius:12px;padding:15px;text-align:left;font-size:15px}
+.stapel button small{display:block;font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:3px}
+.hinweis{font-size:13px;color:var(--muted);margin:6px 0 0;line-height:1.5}
+.fangfokus{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.datumfeld{width:100%;margin-top:6px;background:var(--ink);border:1px solid var(--line);
+  border-radius:10px;padding:11px;text-align:left;font:inherit}
+.datumfeld[aria-expanded=true]{border-color:var(--text)}
+.datumwahl{margin-top:10px;border:1px solid var(--line);border-radius:12px;padding:12px}
+.slot{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) 34px;gap:6px;margin-top:7px;align-items:center}
+.slot input{min-width:0}
+.slot input{margin-top:0;padding:9px 4px;font-family:var(--mono);font-size:16px;text-align:center}
+.slot button{color:var(--muted);font-size:16px}
+.kopfzeile{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) 34px;gap:6px;margin-top:12px}
+.kopfzeile.vier{grid-template-columns:44px minmax(0,1fr) minmax(0,1fr) minmax(0,.8fr)}
+.kopfzeile span{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted);text-align:center}
+.izeile{display:grid;grid-template-columns:44px minmax(0,1fr) minmax(0,1fr) minmax(0,.8fr);gap:6px;margin-top:7px;align-items:center}
+.izeile input{min-width:0}
+.izeile .std{font-family:var(--mono);font-size:12px;color:var(--muted);text-align:center}
+.izeile input{margin-top:0;padding:9px 4px;font-family:var(--mono);font-size:16px;text-align:center}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.chips button{font-family:var(--mono);font-size:11px;border:1px solid var(--line);border-radius:99px;
+  padding:7px 11px;color:var(--muted)}
+.anteilzeile{display:grid;grid-template-columns:minmax(0,1fr) 92px;gap:8px;align-items:center;margin-top:7px}
+.anteilzeile span{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.reihezeile{display:flex;align-items:center;gap:8px;padding:9px 0;border-top:1px solid var(--line2)}
+.reihezeile .rname{flex:1;font-size:14px}
+.reihezeile button{border:1px solid var(--line);border-radius:8px;width:34px;height:30px;
+  color:var(--muted);font-size:13px}
+.anteilzeile input{margin-top:0;padding:9px;text-align:center;font-family:var(--mono);font-size:16px}
+.fiZeile{display:flex;justify-content:space-between;gap:12px;padding:9px 0;
+  border-top:1px solid var(--line);font-size:14px}
+.fiZeile span:first-child{color:var(--muted);font-family:var(--mono);font-size:11.5px;
+  letter-spacing:.08em;text-transform:uppercase}
+.fusszeile{margin-top:26px;padding-top:16px;border-top:1px solid var(--line);
+  font-family:var(--mono);font-size:10.5px;line-height:1.9;color:var(--dim);letter-spacing:.04em}
+.fusszeile a{color:var(--muted)}
+.fusszeile b{color:var(--muted);font-weight:500}
+details summary{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted);cursor:pointer;padding:8px 0}
+@media (prefers-reduced-motion:no-preference){dialog[open]{animation:auf .16s ease}}
+@keyframes auf{from{opacity:0;transform:translateY(8px)}}
+</style>
+</head>
+<body>
+
+<!-- PROFILAUSWAHL -->
+<div id="profilStart" class="hidden">
+  <div class="pInhalt">
+    <div class="pKopf"><div class="eyebrow">Stundenplan</div><h1 id="pFrage">Wer bist du?</h1></div>
+    <div class="pGitter" id="pGitter"></div>
+    <div class="pFuss">
+      <button class="mini" id="pVerwalten">Verwalten</button>
+      <button class="mini hidden" id="pZurueck">Zurück</button>
+    </div>
+  </div>
+</div>
+
+<div class="top">
+  <div class="reiter" role="group" aria-label="Ansicht">
+    <button type="button" id="rTag" aria-pressed="true">Tag</button>
+    <button type="button" id="rKal" aria-pressed="false">Kalender</button>
+    <button type="button" id="rEin" aria-pressed="false">Einträge</button>
+    <button type="button" id="rZeu" aria-pressed="false">Zeugnis</button>
+  </div>
+  <button class="ikon" id="btnEdit" aria-pressed="false" aria-label="Plan bearbeiten">✎</button>
+  <button class="ikon" id="btnProfil" aria-label="Profil wechseln">–</button>
+  <button class="ikon" id="btnEinst" aria-label="Einstellungen">⚙</button>
+</div>
+
+<!-- TAG -->
+<div id="ansichtTag">
+  <header>
+    <div class="eyebrow" id="klasseAnzeige">—</div>
+    <h1 id="titel">—</h1>
+    <div class="countdown" id="countdown"></div>
+    <div class="kw">
+      <button type="button" id="wocheZurueck" aria-label="Woche zurück">‹</button>
+      <button type="button" id="wocheVor" aria-label="Woche vor">›</button>
+      <span class="label" id="kwLabel"></span>
+      <span class="ab hidden" id="abLabel">A</span>
+      <button type="button" id="btnHeute" style="margin-left:auto;width:auto;padding:0 12px">Heute</button>
+    </div>
+  </header>
+  <div class="fortschritt hidden" id="fortschritt">
+    <div class="balken"><i id="balkenFuell"></i></div>
+    <div class="zeile"><span id="fortLinks"></span><span id="fortRechts"></span></div>
+  </div>
+  <div class="frei-banner hidden" id="freiBanner"></div>
+  <div class="frei-banner hidden" id="sicherBanner"></div>
+  <nav class="tage" id="tage" aria-label="Wochentag"></nav>
+  <div id="plan"></div>
+  <p class="hinweis hidden" id="editHinweis">Bearbeiten ist an: Antippen ändert Fach, Raum und Lehrkraft.</p>
+  <section>
+    <div class="eyebrow">An diesem Tag</div>
+    <ul class="liste" id="tagListe"></ul>
+    <p class="nix" id="tagNix" hidden>Nichts eingetragen.</p>
+  </section>
+</div>
+
+<!-- KALENDER -->
+<div id="ansichtKal" class="hidden">
+  <div class="monat">
+    <div class="mLinks"><button class="ikon" id="monatMinus" aria-label="Monat zurück">‹</button></div>
+    <b id="monatLabel"></b>
+    <div class="mRechts">
+      <button class="ikon" id="monatPlus" aria-label="Monat vor">›</button>
+      <button class="mini" id="kalHeute">Heute</button>
+    </div>
+  </div>
+  <div class="gitter" id="gitter"></div>
+  <p class="hinweis">Ein Feld gedrückt halten oder doppelt antippen, um etwas einzutragen.</p>
+  <section>
+    <div class="eyebrow" id="kalTagLabel"></div>
+    <p class="hinweis hidden" id="kalFerien"></p>
+    <ul class="liste" id="kalListe"></ul>
+    <p class="nix" id="kalNix" hidden>Nichts an diesem Tag.</p>
+  </section>
+</div>
+
+<!-- EINTRÄGE -->
+<div id="ansichtEin" class="hidden">
+  <div id="einMenu">
+    <label style="margin-top:0"><span>Suche</span><input type="text" id="suchFeld" placeholder="Fach, Aufgabe, Notiz …"></label>
+    <div class="stapel" id="einKacheln"></div>
+    <ul class="liste" id="suchListe"></ul>
+  </div>
+  <div id="einDetail" class="hidden">
+    <div class="eyebrow mitte" id="einTitel"></div>
+    <p class="hinweis mitte" id="einSubHinweis"></p>
+    <!-- Wird nicht mehr befüllt, bleibt aber stehen: Fassungen bis v31 greifen
+         beim Zeichnen darauf zu. Eine Kennung zu entfernen bricht jede App, die
+         noch mit älterem app.js im Speicher läuft. -->
+    <div id="einKopf"></div>
+    <ul class="liste" id="einListe"></ul>
+    <p class="nix mitte" id="einNix" hidden></p>
+  </div>
+</div>
+
+<!-- ZEUGNIS -->
+<div id="ansichtZeu" class="hidden">
+  <header style="margin-bottom:18px">
+    <div class="eyebrow">Stand heute</div>
+    <h1>Zeugnis <span id="zeuSchnitt"></span></h1>
+  </header>
+  <p class="hinweis" id="zeuHinweis"></p>
+  <p class="hinweis" style="color:var(--akzent)">Nur eine Schätzung. Die App gewichtet alle Noten einer
+     Art gleich; Lehrkräfte rechnen oft anders. Keine amtliche Auskunft.</p>
+  <div id="zeuListe"></div>
+  <p class="nix" id="zeuNix" hidden>Trag zuerst deinen Stundenplan ein — dann erscheinen hier die Fächer.</p>
+</div>
+
+<div id="leerraum"></div>
+
+<div id="toast" class="hidden"></div>
+
+<div id="fuss">
+  <button class="gross" id="btnEintrag">+ Eintrag</button>
+  <div class="wischzone" id="wischzone">
+    <div class="punkte" id="wischPunkte"><i></i><i></i><i></i><i></i></div>
+    <span id="wischText">Wischen wechselt die Ansicht</span>
+  </div>
+</div>
+
+<!-- Block bearbeiten -->
+<dialog id="dlgBlock"><button class="fangfokus" autofocus aria-hidden="true"></button>
+  <h2 id="dlgBlockTitel">Block</h2>
+  <div class="eyebrow" id="dlgBlockZeit"></div>
+  <label><span>Fach</span><input type="text" id="fFach" placeholder="Fach" autocapitalize="characters"></label>
+  <div class="zwei">
+    <label><span>Raum</span><input type="text" id="fRaum" placeholder="Raum" autocapitalize="characters"></label>
+    <label><span>Lehrkraft</span><input type="text" id="fLK" placeholder="Lehrer" autocapitalize="characters"></label>
+  </div>
+  <p class="hinweis hidden" id="hinweisWoche"></p>
+  <div class="reihe">
+    <button type="button" class="weg" id="bBlockLeeren">×</button>
+    <button type="button" id="bBlockAb">Zurück</button>
+    <button type="button" class="haupt" id="bBlockSpeichern">Speichern</button>
+  </div>
+</dialog>
+
+<!-- Schnellzugriff -->
+<dialog id="dlgSchnell"><button class="fangfokus" autofocus aria-hidden="true"></button>
+  <h2 id="schnellTitel" class="mitte">Fach</h2>
+  <div class="eyebrow mitte" id="schnellZeit"></div>
+  <div class="stapel">
+    <button type="button" id="bSchnellHA">Hausaufgabe<small id="bSchnellHAZiel"></small></button>
+    <button type="button" id="bSchnellNotiz">Notiz<small>was heute dran war</small></button>
+    <button type="button" id="bSchnellKlausur">Klausur<small>Termin eintragen</small></button>
+    <button type="button" id="bSchnellFehl">Fehlzeit<small>diese Stunde versäumt</small></button>
+    <button type="button" id="bSchnellAusfall">Fällt aus<small>nur an diesem Tag</small></button>
+    <button type="button" id="bSchnellVertretung">Vertretung<small>anderes Fach oder Raum</small></button>
+    <button type="button" id="bSchnellErsatz">Sonstiges Ereignis<small>nur an diesem Tag</small></button>
+    <button type="button" id="bSchnellInfo">Fach-Info<small>Lehrkraft, Raum, Schnitt, Offenes</small></button>
+  </div>
+</dialog>
+
+<!-- Eintrag -->
+<dialog id="dlgEintrag"><button class="fangfokus" autofocus aria-hidden="true"></button>
+  <h2 id="dlgEintragTitel">Eintrag</h2>
+  <div class="zwei">
+    <label><span>Art</span>
+      <select id="eTyp">
+        <option value="H">Hausaufgabe</option>
+        <option value="K">Klausur</option>
+        <option value="N">Notiz</option>
+        <option value="E">Ereignis</option>
+        <option value="G">Note</option>
+        <option value="M">Merkblatt</option>
+        <option value="F">Fehlzeit</option>
+      </select>
+    </label>
+    <label id="eFachWrap"><span>Fach</span><select id="eFach"></select></label>
+  </div>
+  <label class="hidden" id="eFachFreiWrap"><span>Fach eintippen</span>
+    <input type="text" id="eFachFrei" autocapitalize="characters"></label>
+  <div class="zwei hidden" id="eNoteWrap">
+    <label><span id="eWertLabel">Note</span><input type="text" id="eWert" inputmode="decimal" placeholder="2,3"></label>
+    <label><span>Art</span>
+      <select id="eNArt"><option value="s">schriftlich</option><option value="m">mündlich</option></select></label>
+  </div>
+  <div class="zwei hidden" id="eEreignisWrap">
+    <label><span>Wo</span><input type="text" id="eOrt" placeholder="Raum oder Ort"></label>
+    <label><span>Stunde</span><select id="eStunde"></select></label>
+  </div>
+  <div class="zwei hidden" id="eFehlWrap">
+    <label><span>Art</span>
+      <select id="eFehlArt">
+        <option value="entschuldigt">entschuldigt</option>
+        <option value="unentschuldigt">unentschuldigt</option>
+        <option value="verspätet">verspätet</option>
+      </select></label>
+    <label><span>Stunden</span><input type="number" id="eFehlStd" min="1" max="20" step="1" value="1"></label>
+  </div>
+  <label id="eDatumWrap"><span>Datum</span>
+    <input type="hidden" id="eDatum">
+    <button type="button" class="datumfeld" id="eDatumFeld" aria-expanded="false">—</button>
+  </label>
+  <div class="datumwahl hidden" id="eDatumWahl">
+    <div class="monat klein">
+      <div class="mLinks"><button type="button" class="ikon" id="eMonatMinus" aria-label="Monat zurück">‹</button></div>
+      <b id="eMonatLabel"></b>
+      <div class="mRechts"><button type="button" class="ikon" id="eMonatPlus" aria-label="Monat vor">›</button></div>
+    </div>
+    <div class="gitter" id="eGitter"></div>
+    <p class="hinweis" id="eGitterHinweis"></p>
+  </div>
+  <label id="eTextWrap"><span id="eTextLabel">Was</span><input type="text" id="eText" placeholder="Aufgabe"></label>
+  <label><span id="eNotizLabel">Notizen</span><textarea id="eNotiz" placeholder="Details"></textarea></label>
+  <div class="hidden" id="eBildWrap">
+    <div class="chips">
+      <button type="button" id="bBildWahl">Bild hinzufügen</button>
+      <span class="hinweis" id="bildStand" style="margin:0;align-self:center"></span>
+    </div>
+    <input type="file" id="bildDatei" accept="image/*" multiple style="display:none">
+    <div class="bilder" id="eBilder"></div>
+  </div>
+  <div class="reihe">
+    <button type="button" class="weg hidden" id="bEintragWeg">×</button>
+    <button type="button" id="bEintragAb">Zurück</button>
+    <button type="button" class="haupt" id="bEintragSpeichern">Speichern</button>
+  </div>
+</dialog>
+
+<!-- Merkblatt ansehen -->
+<dialog id="dlgSchau"><button class="fangfokus" autofocus aria-hidden="true"></button>
+  <h2 id="schauTitel" class="mitte">Merkblatt</h2>
+  <div class="eyebrow mitte" id="schauStand"></div>
+  <div class="merkschau" id="schauText"></div>
+  <div class="bilder" id="schauBilder"></div>
+  <div class="reihe">
+    <button type="button" id="bSchauBearbeiten">Bearbeiten</button>
+    <button type="button" class="haupt" id="bSchauAb">Fertig</button>
+  </div>
+</dialog>
+
+<!-- Was an diesem Kalendertag? -->
+<dialog id="dlgKalTag"><button class="fangfokus" autofocus aria-hidden="true"></button>
+  <h2 id="kmTitel" class="mitte">Tag</h2>
+  <div class="eyebrow mitte" id="kmStand"></div>
+  <div class="stapel">
+    <button type="button" id="bKmTermin">Termin<small>ganzer Tag oder eine bestimmte Stunde</small></button>
+    <button type="button" id="bKmHA">Hausaufgabe<small>mit Fälligkeit an diesem Tag</small></button>
+    <button type="button" id="bKmKlausur">Klausur<small>Termin eintragen</small></button>
+    <button type="button" id="bKmNotiz">Notiz<small>freier Text zu diesem Tag</small></button>
+    <button type="button" id="bKmFehl">Fehlzeit<small>versäumte Stunden</small></button>
+    <button type="button" id="bKmFrei"><span id="bKmFreiText">Freier Tag</span><small id="bKmFreiKlein"></small></button>
+  </div>
+  <div class="reihe">
+    <button type="button" class="haupt" id="bKmAb">Zurück</button>
+  </div>
+</dialog>
+
+<!-- Freier Tag -->
+<dialog id="dlgTagFrei"><button class="fangfokus" autofocus aria-hidden="true"></button>
+  <h2 class="mitte">Tag markieren</h2>
+  <div class="eyebrow mitte" id="tfDatum"></div>
+  <p class="hinweis">Für schuleigene freie Tage, Praktika oder Ausflüge. Der Tag wird grau
+     dargestellt und aus dem Unterricht herausgenommen.</p>
+  <label><span>Bezeichnung</span><input type="text" id="tfName" placeholder="Beweglicher Ferientag"></label>
+  <label><span>bis einschließlich</span><input type="date" id="tfBis"></label>
+  <div class="reihe">
+    <button type="button" class="weg hidden" id="bTagFreiWeg">×</button>
+    <button type="button" id="bTagFreiAb">Zurück</button>
+    <button type="button" class="haupt" id="bTagFreiSpeichern">Speichern</button>
+  </div>
+</dialog>
+
+<!-- Verhältnis je Fach -->
+<dialog id="dlgAnteil"><button class="fangfokus" autofocus aria-hidden="true"></button>
+  <h2 id="anTitel">Verhältnis</h2>
+  <p class="hinweis">Wie stark zählt die mündliche Note in diesem Fach?</p>
+  <label><span>mündlich %</span><input type="number" id="anWert" min="0" max="100" step="5"></label>
+  <p class="hinweis" id="anHinweis"></p>
+  <div class="eyebrow" style="margin-top:20px">Zielnote</div>
+  <p class="hinweis">Was müsste die nächste Note sein, um dieses Ziel zu erreichen?</p>
+  <div class="zwei">
+    <label><span>Ziel</span><input type="text" id="anZiel" inputmode="decimal" placeholder="2,0"></label>
+    <label><span>als</span>
+      <select id="anZielArt"><option value="s">schriftlich</option><option value="m">mündlich</option></select></label>
+  </div>
+  <p class="hinweis" id="anZielErgebnis"></p>
+  <div class="reihe">
+    <button type="button" id="bAnStandard">Standard</button>
+    <button type="button" class="haupt" id="bAnSpeichern">Speichern</button>
+  </div>
+</dialog>
+
+<!-- Fach-Info -->
+<dialog id="dlgFach"><button class="fangfokus" autofocus aria-hidden="true"></button>
+  <h2 id="fiTitel" class="mitte">Fach</h2>
+  <div class="eyebrow mitte" id="fiKuerzel"></div>
+  <div id="fiInhalt"></div>
+  <div class="reihe">
+    <button type="button" id="bFachMerk">Merkblätter</button>
+    <button type="button" class="haupt" id="bFachAb">Zurück</button>
+  </div>
+</dialog>
+
+<!-- Plan einfügen -->
+<dialog id="dlgImport"><button class="fangfokus" autofocus aria-hidden="true"></button>
+  <h2>Plan einfügen</h2>
+  <div class="zwei">
+    <label><span>Tag</span><select id="iTag"></select></label>
+    <label id="iWocheWrap"><span>Woche</span>
+      <select id="iWoche"><option value="A">A</option><option value="B">B</option></select></label>
+  </div>
+  <div class="kopfzeile vier" style="margin-top:16px"><span>Std.</span><span>Fach</span><span>Raum</span><span>LK</span></div>
+  <div id="iTabelle"></div>
+  <details style="margin-top:16px">
+    <summary>Aus der Zwischenablage füllen</summary>
+    <p class="hinweis">Erwartet je Stunde eine Zeile im Format <b>FACH, RAUM (LEHRKRAFT)</b>.</p>
+    <textarea id="iText" placeholder="1&#10;FACH, RAUM (LEHRER)"></textarea>
+    <div class="chips"><button type="button" id="bImportText">In die Tabelle übernehmen</button></div>
+    <p class="hinweis" id="iErgebnis"></p>
+  </details>
+  <div class="reihe">
+    <button type="button" id="bImportAb">Zurück</button>
+    <button type="button" class="haupt" id="bImportSpeichern">Speichern</button>
+  </div>
+</dialog>
+
+<!-- Anleitung -->
+<dialog id="dlgHilfe"><button class="fangfokus" autofocus aria-hidden="true"></button>
+  <div class="hKopf">
+    <h2>Anleitung</h2>
+    <input type="search" id="hilfeSuche" placeholder="Stichwort suchen, etwa „Sicherung“ …"
+      autocomplete="off" autocapitalize="none" spellcheck="false">
+    <div id="hilfeStand"></div>
+  </div>
+  <div id="hilfeKoerper">
+    <nav id="hilfeVerzeichnis" aria-label="Inhaltsverzeichnis"></nav>
+    <div id="hilfeInhalt"></div>
+  </div>
+  <div class="reihe">
+    <button type="button" id="bHilfeOben">↑ Anfang</button>
+    <button type="button" class="haupt" id="bHilfeAb">Fertig</button>
+  </div>
+</dialog>
+
+<!-- Einstellungen -->
+<dialog id="dlgEinst"><button class="fangfokus" autofocus aria-hidden="true"></button>
+  <h2>Einstellungen</h2>
+  <div class="chips">
+    <button type="button" id="btnHilfe" style="border-color:var(--akzent);color:var(--akzent)">
+      Anleitung und Technik</button>
+  </div>
+
+  <div class="eyebrow" style="margin-top:18px">Darstellung</div>
+  <div class="zwei">
+    <label><span>Akzentfarbe</span><input type="color" id="sFarbe"></label>
+    <label><span>Hex</span><input type="text" id="sFarbeHex" placeholder="#e5382b"></label>
+  </div>
+  <div class="chips" id="sFarbVorlagen"></div>
+  <div class="zwei">
+    <label><span>Modus</span>
+      <select id="sModus"><option value="dunkel">Dunkel</option><option value="hell">Hell</option></select></label>
+    <label><span>Schrift</span>
+      <select id="sSchrift">
+        <option value="system">System</option>
+        <option value="mono">Technisch</option>
+        <option value="serif">Serif</option>
+      </select></label>
+  </div>
+
+  <label style="margin-top:14px"><span>Beim Öffnen</span>
+    <select id="sStartProfil">
+      <option value="immer">immer zur Profilauswahl</option>
+      <option value="mehrere">nur bei mehreren Profilen</option>
+      <option value="nie">gleich in den Plan</option>
+    </select></label>
+
+  <div class="eyebrow" style="margin-top:22px">Schule</div>
+  <label><span>Klasse</span><input type="text" id="sKlasse" placeholder="Deine Klasse"></label>
+  <div class="chips"><button type="button" id="sImport">Plan einfügen</button></div>
+
+  <div class="eyebrow" style="margin-top:22px">Stundenraster</div>
+  <p class="hinweis">„Std." sind die Stundennummern, die dieses Feld abdeckt.</p>
+  <div class="chips">
+    <button type="button" data-vorlage="bbsPapenburg">BBS Papenburg (Blöcke)</button>
+    <button type="button" data-vorlage="block90">4 Blöcke à 90 min</button>
+    <button type="button" data-vorlage="einzel45">8 Einzelstunden</button>
+  </div>
+  <div class="kopfzeile"><span>Std.</span><span>von</span><span>bis</span><span></span></div>
+  <div id="slotEditor"></div>
+  <div class="chips"><button type="button" id="sSlotPlus">+ Zeile</button></div>
+
+  <div class="eyebrow" style="margin-top:22px">Wochenwechsel</div>
+  <label style="display:flex;align-items:center;gap:10px;margin-top:10px">
+    <input type="checkbox" id="sZweiWochen" style="width:18px;flex:none;margin:0">
+    <span style="letter-spacing:0;text-transform:none;font-family:var(--sans);font-size:14px;color:var(--text)">
+      A- und B-Woche getrennt führen</span>
+  </label>
+  <p class="hinweis" id="ankerWrap">Feste Regel: ungerade Kalenderwoche = <b>A</b>, gerade = <b>B</b>.
+     <span id="ankerJetzt"></span></p>
+  <div class="chips hidden" id="sWocheKopieren">
+    <button type="button" data-kopiere="AB">A-Woche → B-Woche</button>
+    <button type="button" data-kopiere="BA">B-Woche → A-Woche</button>
+  </div>
+  <p class="hinweis" id="sWocheStand"></p>
+
+  <div class="eyebrow" style="margin-top:22px">Noten</div>
+  <div class="zwei">
+    <label><span>System</span>
+      <select id="sNotenSystem">
+        <option value="note6">Noten 1–6</option>
+        <option value="punkte15">Punkte 0–15</option>
+      </select></label>
+    <label><span>mündlich %</span><input type="number" id="sAnteilM" min="0" max="100" step="5"></label>
+  </div>
+  <p class="hinweis" id="sAnteilHinweis"></p>
+  <div class="eyebrow" style="margin-top:16px">Verhältnis je Fach</div>
+  <p class="hinweis">Leer lassen heißt: Standard von oben.</p>
+  <div id="sAnteilFaecher"></div>
+
+  <div class="eyebrow" style="margin-top:22px">Fehlzeiten</div>
+  <label><span>Stunden je Schultag</span><input type="number" id="sStdProTag" min="1" max="16" step="1"></label>
+  <p class="hinweis">Damit rechnet das Zeugnis versäumte Stunden in Tage um.</p>
+
+  <div class="eyebrow" style="margin-top:22px">Archiv</div>
+  <label><span>Gelöschtes aufbewahren</span>
+    <select id="sArchivTage">
+      <option value="0">für immer</option>
+      <option value="30">30 Tage</option>
+      <option value="90">3 Monate</option>
+      <option value="180">6 Monate</option>
+      <option value="365">1 Jahr</option>
+    </select></label>
+  <p class="hinweis" id="sArchivHinweis"></p>
+
+  <div class="eyebrow" style="margin-top:22px">Reihenfolge im Einträge-Menü</div>
+  <div id="sReiheEin"></div>
+
+  <div class="eyebrow" style="margin-top:22px">Reihenfolge der Fächer</div>
+  <p class="hinweis">Gilt für das Zeugnis.</p>
+  <div id="sReiheFach"></div>
+
+  <div class="eyebrow" style="margin-top:22px">Erinnerungen</div>
+  <p class="hinweis">Die App kann sich nicht selbst wecken. Sie meldet sich beim Öffnen —
+     für echte Wecker nutze den Kalender-Export.</p>
+  <label style="display:flex;align-items:center;gap:10px;margin-top:10px">
+    <input type="checkbox" id="sMelden" style="width:18px;flex:none;margin:0">
+    <span style="letter-spacing:0;text-transform:none;font-family:var(--sans);font-size:14px;color:var(--text)">
+      Beim Öffnen an Klausuren und Hausaufgaben erinnern</span>
+  </label>
+  <div class="chips">
+    <button type="button" id="sMeldeRecht">Benachrichtigungen erlauben</button>
+    <button type="button" id="sIcs">Kalender-Export (.ics)</button>
+  </div>
+  <p class="hinweis" id="sMeldeStand"></p>
+
+  <div class="eyebrow" style="margin-top:22px">Ferien und Feiertage</div>
+  <label><span>Bundesland</span><select id="sLand"></select></label>
+  <div class="chips">
+    <button type="button" id="sFerienLaden">Ferien laden</button>
+    <button type="button" id="sFerienWeg">Entfernen</button>
+  </div>
+  <p class="hinweis" id="sFerienStand"></p>
+
+  <div class="eyebrow" style="margin-top:22px">Lehrkräfte</div>
+  <p class="hinweis">Je Zeile ein Kürzel und der Name, getrennt durch ein Gleichheitszeichen.</p>
+  <textarea id="sLehrer" style="min-height:90px" placeholder="KÜRZEL = Name"></textarea>
+  <div class="eyebrow" style="margin-top:22px">Fachnamen</div>
+  <textarea id="sFaecher" style="min-height:90px" placeholder="KÜRZEL = Fachname"></textarea>
+
+  <div class="eyebrow" style="margin-top:22px">Sicherung</div>
+  <p class="hinweis" id="sSicherStand"></p>
+  <div class="chips">
+    <button type="button" id="sDatei">Als Datei sichern</button>
+    <button type="button" id="sDateiAlle">Alle Profile sichern</button>
+    <button type="button" id="sDateiWahl">Datei einlesen</button>
+    <button type="button" id="sTeilen">Teilen</button>
+  </div>
+
+  <div class="eyebrow" style="margin-top:20px">Erinnerung</div>
+  <div class="zwei">
+    <label><span>Sichern alle</span>
+      <select id="sRhythmus">
+        <option value="0">nie erinnern</option>
+        <option value="7">7 Tage</option>
+        <option value="14">14 Tage</option>
+        <option value="28">28 Tage</option>
+        <option value="90">3 Monate</option>
+      </select></label>
+    <label><span>Aufheben</span>
+      <select id="sHalten">
+        <option value="1">1 Monat</option>
+        <option value="3">3 Monate</option>
+        <option value="6">6 Monate</option>
+        <option value="12">1 Jahr</option>
+        <option value="0">alles behalten</option>
+      </select></label>
+  </div>
+  <p class="hinweis" id="sRhythmusHinweis"></p>
+
+  <div class="eyebrow" style="margin-top:20px">Sicherungsordner</div>
+  <div id="sOrdnerGeht" class="hidden">
+    <p class="hinweis">Wähle einmal einen Ordner — danach legt die App ihre Sicherungen
+       immer dort ab, ohne zu fragen.</p>
+    <label style="display:flex;align-items:center;gap:10px;margin-top:10px">
+      <input type="checkbox" id="sAuto" style="width:18px;flex:none;margin:0">
+      <span style="letter-spacing:0;text-transform:none;font-family:var(--sans);font-size:14px;color:var(--text)">
+        Beim Öffnen automatisch in den Ordner sichern, wenn es fällig ist</span>
+    </label>
+    <div class="chips">
+      <button type="button" id="sOrdnerWahl">Ordner wählen</button>
+      <button type="button" id="sOrdnerJetzt">Jetzt dorthin sichern</button>
+      <button type="button" id="sOrdnerWeg">Ordner lösen</button>
+    </div>
+    <p class="hinweis" id="sOrdnerStand"></p>
+  </div>
+  <p class="hinweis hidden" id="sOrdnerGehtNicht">
+     Dieser Browser kann keinen festen Ordner vergeben — das können bislang nur
+     Chrome und Edge auf dem Rechner. Sicherungen landen deshalb im normalen
+     Download-Ordner.<br><br>
+     <b>Auf dem Handy:</b> In Chrome unter <i>⋮ → Einstellungen → Downloads</i> die
+     Option <i>Speicherort für Dateien abfragen</i> einschalten. Dann fragt jeder
+     Download nach dem Ordner, und du kannst dort einen eigenen anlegen.</p>
+  <input type="file" id="sDateiLesen" accept="application/json,.json" style="display:none">
+  <textarea id="sDaten"></textarea>
+  <div class="chips">
+    <button type="button" id="sLaden">Text übernehmen</button>
+    <button type="button" id="sReset">Alles löschen</button>
+  </div>
+
+  <div class="eyebrow" style="margin-top:22px">Speicher</div>
+  <p class="hinweis" id="sSpeicher"></p>
+
+  <div class="reihe">
+    <button type="button" id="sUpdate">Nach Update suchen</button>
+    <button type="button" class="haupt" id="bEinstSpeichern">Speichern</button>
+  </div>
+
+  <div class="fusszeile">
+    <div>Stundenplan <b id="sVersion">—</b></div>
+    <div>von <a href="https://github.com/DjKamma420" target="_blank" rel="noopener">DjKamma420</a>
+       · <a href="https://github.com/DjKamma420/StundenplanNothing" target="_blank" rel="noopener">Quellcode</a></div>
+    <div>MIT-Lizenz — Weiterverwendung erlaubt, Urheberhinweis behalten</div>
+    <div>Ferien und Feiertage von
+       <a href="https://openholidaysapi.org" target="_blank" rel="noopener">openholidaysapi.org</a></div>
+    <div>Entwickelt mit KI-Unterstützung</div>
+  </div>
+</dialog>
+
+<script src="app.js"></script>
+</body>
+</html>

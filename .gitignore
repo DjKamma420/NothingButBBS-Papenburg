@@ -1,0 +1,7 @@
+# Von Capacitor/Gradle erzeugt — entsteht bei jedem Build neu, nie committen.
+node_modules/
+www/
+android/
+*.apk
+*.aab
+.gradle/
