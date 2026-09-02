@@ -8,9 +8,10 @@ Diese Datei hält nur fest, was hier anders ist.
 ## Unterschiede zum Ursprungsprojekt
 
 1. **Zusätzliche Stundenraster-Vorlage** `bbsPapenburg` in `VORLAGEN`
-   (app.js) mit den Blockzeiten der BBS Papenburg. Quelle: bbs-papenburg.de,
-   Stand der Recherche siehe CHANGELOG. Zeiten ändern sich an Schulen
-   gelegentlich — vor jedem neuen Schuljahr stichprobenartig prüfen.
+   (app.js) mit den Blockzeiten der BBS Papenburg — bestätigt am 2026-09-02
+   gegen FAQ und Schulordnung der Schule, Quellen siehe CHANGELOG und
+   Kommentar in app.js. Zeiten ändern sich an Schulen gelegentlich — vor
+   jedem neuen Schuljahr stichprobenartig prüfen.
 2. **Capacitor-Hülle** für eine Android-APK: `package.json`,
    `capacitor.config.json`, `.github/workflows/apk-bauen.yml`. Die Web-App
    selbst bleibt buildfrei (Regel 3 des Ursprungsprojekts gilt weiter);
@@ -52,6 +53,12 @@ Kalender-Abo-Link (ICS/webcal) aus dem Portal — kein Passwort, vom
 Anbieter selbst für genau diesen Zweck vorgesehen. Erst einbauen, wenn
 jemand bestätigt, dass es diesen Link bei dieser Schule gibt.
 
+Stand 2026-09-02: Das Portal ist `virtueller-stundenplan.org`
+(E-Mail/Passwort oder Office365-Login), nicht WebUntis. In der öffentlich
+zugänglichen Oberfläche wurde kein ICS/webcal-Abo-Link gefunden — Status
+also weiterhin unbestätigt. Kein ICS-Feature als vorhanden dokumentieren
+oder bauen, bis das jemand mit echtem Zugang zum Portal bestätigt.
+
 Diese Regel nur aufheben, wenn der Nutzer ausdrücklich bestätigt, dass er
 die drei Punkte oben kennt und das Risiko trotzdem eingehen will — und
 selbst dann zuerst klären, für wen die App gedacht ist (nur er selbst,
@@ -67,5 +74,5 @@ löst `.github/workflows/apk-bauen.yml` aus. Ergebnis liegt danach als
 Actions-Artefakt "stundenplan-bbs-papenburg-apk" bereit (Debug-APK,
 unsigniert — für den Play Store müsste sie noch signiert werden).
 
-Lokal, mit Android SDK: `npm install && npx cap add android && npx cap
+Lokal, mit Android SDK: `npm ci && npx cap add android && npx cap
 sync android && cd android && ./gradlew assembleDebug`.

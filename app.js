@@ -100,9 +100,12 @@ const VORLAGEN = {
     {std:"5", von:"11:40", bis:"12:25"}, {std:"6", von:"12:25", bis:"13:10"},
     {std:"7", von:"13:40", bis:"14:25"}, {std:"8", von:"14:25", bis:"15:10"}
   ],
-  /* Blockzeiten der BBS Papenburg. Quelle: bbs-papenburg.de — beim Einrichten
-     nachprüfen, Zeiten ändern sich gelegentlich; hier ist es nur ein Vorschlag,
-     kein hart verdrahteter Wert (Regel: nichts schulabhängig fest verdrahten). */
+  /* Blockzeiten der BBS Papenburg. Bestätigt am 2026-09-02 gegen die
+     offizielle FAQ (start.bbs-papenburg.de/faq.php) und die Schulordnung
+     (Fassung 2.7, start.bbs-papenburg.de/images/Schulordnung.pdf) — beide
+     nennen dieselben vier Zeiten Montag-Freitag. Schulen ändern Zeiten
+     dennoch gelegentlich; hier ist es nur ein Vorschlag, kein hart
+     verdrahteter Wert (Regel: nichts schulabhängig fest verdrahten). */
   bbsPapenburg: [
     {std:"1,2", von:"08:10", bis:"09:40"},
     {std:"3,4", von:"10:00", bis:"11:30"},

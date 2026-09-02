@@ -27,7 +27,7 @@ jobs:
           node-version: 20
 
       - name: Capacitor-Abhängigkeiten installieren
-        run: npm install --no-fund --no-audit
+        run: npm ci --no-fund --no-audit
 
       - uses: actions/setup-java@v4
         with:
