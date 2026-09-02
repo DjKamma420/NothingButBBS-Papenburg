@@ -2,7 +2,7 @@
    The version number lives ONLY here. The app asks for it via message and
    compares it against the server's copy. Bump this line after every change
    to index.html, app.js, or sprache.js. */
-const VERSION = "v43";
+const VERSION = "v44";
 const DATEIEN = ["./","./index.html","./app.js","./sprache.js","./manifest.webmanifest","./icon-192.png","./icon-512.png"];
 
 /* cache:"reload" forces the network. Without it the browser may serve

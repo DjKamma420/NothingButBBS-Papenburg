@@ -361,14 +361,14 @@ const sonderTag    = d => sonderAktiv().filter(x => x.datum === iso(d));
 const eintraegeAm  = d => aktiv().filter(e => e.datum === iso(d) && e.typ !== "M")
   .sort((a,b) => (a.erledigt - b.erledigt) || "KHFN".indexOf(a.typ) - "KHFN".indexOf(b.typ));
 
-function faecher(){
+function subjects(){
   const s = new Set();
   /* plan[w] kann fehlen, wenn gelesen wird, bevor normalisiere() lief. */
   ["A","B"].forEach(w => TAGE.forEach(t =>
     ((plan[w] && plan[w][t]) || []).forEach(x => x && x.fach && s.add(x.fach))));
   return [...s].sort();
 }
-const alleFaecher = () => [...new Set([...faecher(), ...notenAktiv().map(n => n.fach),
+const alleFaecher = () => [...new Set([...subjects(), ...notenAktiv().map(n => n.fach),
   ...aktiv().map(e => e.fach)])].filter(Boolean).sort();
 const lehrerName = k => (cfg.lehrer && cfg.lehrer[k]) || k || "";
 const fachName   = k => (cfg.fachnamen && cfg.fachnamen[k]) || k || "";
@@ -566,7 +566,7 @@ const sicherungAlter = () => {
   const l = sicherungDatum();
   return l ? Math.round((new Date() - new Date(l+"T12:00"))/864e5) : null;
 };
-const hatEchteDaten = () => !!(eintraege.length || noten.length || faecher().length);
+const hatEchteDaten = () => !!(eintraege.length || noten.length || subjects().length);
 function sicherungFaellig(){
   const tage = Math.max(0, Number(cfg.sicherTage) || 0);
   if(!tage || !hatEchteDaten()) return false;
@@ -597,7 +597,7 @@ $("#sicherBanner").onclick = e => {
 /* Kurze Rückmeldung für Dinge, die von selbst passieren. Was unsichtbar
    geschieht, glaubt einem niemand. */
 let hinweisUhr = null;
-function kurzHinweis(text){
+function shortHint(text){
   const el = $("#toast"); if(!el) return;
   el.textContent = text;
   el.classList.remove("hidden");
@@ -897,7 +897,7 @@ const alsTage = std => {
   return t % 1 ? t.toFixed(1).replace(".", ",") : String(t);
 };
 const tageText = std => { const t = alsTage(std); return `${t} ${t === "1" ? "Tag" : "Tage"}`; };
-function fehlText(){
+function errorText(){
   const g = fehlStunden(), u = fehlStunden("unentschuldigt");
   if(!g) return "";
   return `${zahl(g,"Stunde","Stunden")} = ${tageText(g)}`
@@ -905,7 +905,7 @@ function fehlText(){
 }
 function zeichneFehlzeiten(){
   const liste = listeVonTyp("F");
-  $("#einSubHinweis").textContent = fehlText();
+  $("#einSubHinweis").textContent = errorText();
   $("#einListe").innerHTML = liste.map(e => `<li>
     <span style="width:18px;flex:none"></span>
     <div class="wachs" data-bearbeite="${e.id}">
@@ -919,7 +919,7 @@ function zeichneFehlzeiten(){
 
 /** Fächer in der eingestellten Reihenfolge, neue hinten angehängt. */
 function fachReihenfolge(){
-  const alle = alleFaecher().filter(f => faecher().includes(f) || notenAktiv().some(n => n.fach === f));
+  const alle = alleFaecher().filter(f => subjects().includes(f) || notenAktiv().some(n => n.fach === f));
   const wunsch = Array.isArray(cfg.reiheFach) ? cfg.reiheFach : [];
   return [...wunsch.filter(f => alle.includes(f)), ...alle.filter(f => !wunsch.includes(f))];
 }
@@ -928,7 +928,7 @@ function zeichneZeugnis(){
   const schnitte = liste.map(f => notenSchnitt(f).gesamt).filter(w => w !== null);
   const gesamt = schnitte.length ? schnitte.reduce((a,b) => a+b, 0)/schnitte.length : null;
   $("#zeuSchnitt").textContent = gesamt === null ? "" : notenText(gesamt);
-  const fehl = fehlText();
+  const fehl = errorText();
   $("#zeuHinweis").textContent = (notenAktiv().length
     ? `Aus ${zahl(notenAktiv().length,"Note","Noten")} in ${schnitte.length} von ${liste.length} Fächern.`
     : "Noch keine Noten. Tippe ein Fach an, um Verhältnis und Zielnote zu setzen.")
@@ -1947,14 +1947,14 @@ function icsBauen(){
   zeilen.push("END:VCALENDAR");
   return zeilen.filter(Boolean).flatMap(icsFalten).join("\r\n") + "\r\n";
 }
-function herunterladen(text, name, typ){
+function downloadFile(text, name, typ){
   const url = URL.createObjectURL(new Blob([text], {type:typ}));
   const a = document.createElement("a");
   a.href = url; a.download = name;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
-$("#sIcs").onclick = () => herunterladen(icsBauen(), `stundenplan-termine-${iso(new Date())}.ics`, "text/calendar");
+$("#sIcs").onclick = () => downloadFile(icsBauen(), `stundenplan-termine-${iso(new Date())}.ics`, "text/calendar");
 
 /* =====================================================================
    Sicherungen prüfen
@@ -2210,12 +2210,12 @@ async function jetztSichern(fragen){
   try{
     const fertig = await inOrdnerSichern(fragen);
     if(fertig){
-      kurzHinweis(`Gesichert: ${fertig.name}`
+      shortHint(`Gesichert: ${fertig.name}`
         + (fertig.weg ? ` · ${zahl(fertig.weg,"alte Datei","alte Dateien")} entfernt` : ""));
       return true;
     }
   }catch(e){ showError("Ordner: " + ((e && e.message) || e)); return false; }
-  herunterladen(sicherungInhalt(), sicherungDateiname(), "application/json");
+  downloadFile(sicherungInhalt(), sicherungDateiname(), "application/json");
   sicherungNotiert();
   return true;
 }
@@ -2226,7 +2226,7 @@ async function autoSicherung(){
   await ordnerLaden();
   try{
     const fertig = await inOrdnerSichern(false);
-    if(fertig) kurzHinweis(`Sicherung angelegt: ${fertig.name}`
+    if(fertig) shortHint(`Sicherung angelegt: ${fertig.name}`
       + (fertig.weg ? ` · ${zahl(fertig.weg,"alte Datei","alte Dateien")} entfernt` : ""));
   }catch(e){}
 }
@@ -2758,13 +2758,13 @@ function hilfeZeichnen(){
   if(klein) hilfeMarkieren($("#hilfeInhalt"), wort);
 }
 
-function hilfeOeffnen(){
+function openHelp(){
   $("#hilfeSuche").value = "";
   hilfeZeichnen();
   dlgHilfe.showModal();
   $("#hilfeKoerper").scrollTop = 0;
 }
-$("#btnHilfe").onclick = hilfeOeffnen;
+$("#btnHilfe").onclick = openHelp;
 $("#bHilfeAb").onclick = () => dlgHilfe.close();
 $("#bHilfeOben").onclick = () => { $("#hilfeKoerper").scrollTop = 0; };
 $("#hilfeSuche").oninput = hilfeZeichnen;
@@ -3072,11 +3072,11 @@ function sicherungNotiert(){
   sichern(); sicherungStand(); zeichne();
 }
 $("#sDatei").onclick = () => {
-  herunterladen(sicherungsText(), `stundenplan-${dateiName()}-${iso(new Date())}.json`, "application/json");
+  downloadFile(sicherungsText(), `stundenplan-${dateiName()}-${iso(new Date())}.json`, "application/json");
   sicherungNotiert();
 };
 $("#sDateiAlle").onclick = () => {
-  herunterladen(sicherungAlleText(), `stundenplan-alle-${iso(new Date())}.json`, "application/json");
+  downloadFile(sicherungAlleText(), `stundenplan-alle-${iso(new Date())}.json`, "application/json");
   sicherungNotiert();
 };
 $("#sDateiWahl").onclick = () => sDateiLesen.click();
@@ -3101,7 +3101,7 @@ $("#sTeilen").onclick = async () => {
       alert("Dein Gerät kann keine Dateien teilen. Die Sicherung liegt jetzt in der "
         + "Zwischenablage — füge sie irgendwo ein, wo sie bleibt.");
     } else {
-      herunterladen(text, name, "application/json");
+      downloadFile(text, name, "application/json");
     }
     sicherungNotiert();
   }catch(e){
@@ -3170,7 +3170,7 @@ $("#sReset").onclick = () => {
 };
 $("#sUpdate").onclick = async () => {
   const s = await versionPruefen();
-  if(s && s.veraltet) aktualisieren();
+  if(s && s.veraltet) checkForUpdate();
   else alert("Du bist auf dem neuesten Stand" + (s && s.laeuft ? " (" + s.laeuft + ")." : "."));
 };
 $("#bEinstSpeichern").onclick = () => {
@@ -3241,13 +3241,13 @@ async function versionPruefen(){
     w.textContent = veraltet ? `${laeuft} · ${server} verfügbar — tippen zum Aktualisieren`
                              : "Wischen wechselt die Ansicht · " + BUILD;
     w.style.color = veraltet ? "var(--akzent)" : "";
-    w.onclick = veraltet ? aktualisieren : null;
+    w.onclick = veraltet ? checkForUpdate : null;
   }
   const v = $("#sVersion");
   if(v) v.textContent = veraltet ? `${laeuft} (neu: ${server})` : BUILD;
   return {laeuft, server, veraltet};
 }
-async function aktualisieren(){
+async function checkForUpdate(){
   try{
     const reg = await navigator.serviceWorker.getRegistration();
     if(reg){ await reg.update(); if(reg.waiting) reg.waiting.postMessage("sofort"); }
