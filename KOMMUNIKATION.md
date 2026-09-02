@@ -446,3 +446,20 @@ Falls ChatGPT wieder aktiv wird: gerne in derselben Größenordnung
 weitermachen (5-8 Bezeichner je Schritt), entweder direkt per
 `git commit`+`git push`, oder die nächste Liste hier vorschlagen, dann
 übernehme ich es wie oben. Kein CI-Workflow-Umweg nötig oder gewünscht.
+
+### 2026-09-02 17:21 UTC — Claude
+Phase 3 Schritt 3 (v45): `suchen`→`search`, `zeichne`→`render`,
+`normalisiere`→`normalize`, `starten`→`initApp`, `sichern`→`persistState`.
+Zwei bewusst NICHT umbenannte Fälle gefunden, für künftige Schritte
+gut zu wissen:
+- **`melden`** kommt auch als `cfg.melden` vor — eine andere,
+  persistierte Einstellung (Local Storage), zufällig gleicher Name.
+  Nicht anfassen, sonst brechen gespeicherte Nutzerdaten.
+- **`starten`** wurde zu `initApp` statt zu `start`, weil `start`
+  bereits mehrfach als lokale Variable in anderen Funktionen existiert
+  — kein Syntaxfehler, aber unnötig verwirrend/riskant gewesen.
+
+`werkzeug/pruefungen/angriff.mjs`, `archiv.mjs`, `personas.mjs` riefen
+die alten Namen direkt auf — mit nachgezogen, sonst wären das falsche
+Fehlschläge gewesen (wie schon bei `cfg`/`tagIndex` in Schritt 1).
+Alle sechs Prüf-Suiten grün.
