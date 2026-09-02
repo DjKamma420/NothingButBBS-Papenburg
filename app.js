@@ -166,7 +166,7 @@ function saveProfiles(){
     localStorage.setItem("profilAktiv", profilId);
   }catch(e){}
 }
-function profileLaden(){
+function loadProfiles(){
   try{
     profile = JSON.parse(localStorage.getItem("profile") || "[]");
     profilId = localStorage.getItem("profilAktiv") || "1";
@@ -183,7 +183,7 @@ function profileLaden(){
   }
   if(!profile.some(x => x.id === profilId)) profilId = profile[0].id;
 }
-profileLaden();
+loadProfiles();
 const profilName = () => (profile.find(x => x.id === profilId) || {}).name || "Profil";
 
 let cfg, plan, eintraege, ferien, sonder, noten;
@@ -237,7 +237,7 @@ const zwei = n => String(n).padStart(2,"0");
 const iso  = d => `${d.getFullYear()}-${zwei(d.getMonth()+1)}-${zwei(d.getDate())}`;
 const gleich = (a,b) => iso(a) === iso(b);
 const zeigDatum = s => s ? s.slice(8,10)+"."+s.slice(5,7)+"."+s.slice(0,4) : "";
-function montagVon(d){
+function mondayOf(d){
   const x = new Date(d); x.setHours(0,0,0,0);
   const wt = x.getDay() === 0 ? 7 : x.getDay();
   x.setDate(x.getDate() - (wt - 1)); return x;
@@ -379,7 +379,7 @@ function hatFachAm(d, fach){
   const woche = plan[wocheFuer(d)];
   return ((woche && woche[TAGE[i]]) || []).some(x => x && x.fach && x.fach.toUpperCase() === fach);
 }
-function naechsterTagMitFach(d, fach){
+function nextDayWithSubject(d, fach){
   for(let i = 1; i <= 120; i++){
     const x = plusTage(d, i);
     if(hatFachAm(x, fach) && !freiAm(x)) return x;
@@ -393,7 +393,7 @@ const anteilFuer = fach => {
   return Math.max(0, Math.min(100, Number((e === undefined || e === null) ? cfg.anteilM : e) || 0));
 };
 const hatEigenenAnteil = f => cfg.anteile && cfg.anteile[f] !== undefined && cfg.anteile[f] !== null;
-function notenSchnitt(fach){
+function gradeAverage(fach){
   const teil = art => {
     const l = notenAktiv().filter(n => n.fach === fach && n.art === art);
     return l.length ? l.reduce((s,n) => s + n.wert, 0) / l.length : null;
@@ -473,11 +473,11 @@ function zeichneTag(){
   b.classList.toggle("hidden", !frei);
   if(frei) b.innerHTML = `<b>${esc(frei.name)}</b><div>${frei.typ === "feiertag" ? "Feiertag" : "Ferien"} · kein Unterricht</div>`;
 
-  const mo = montagVon(gewaehlt);
+  const mo = mondayOf(gewaehlt);
   $("#tage").innerHTML = [...TAGE, "WE"].map((t,i) => {
     const d = plusTage(mo, i === 5 ? 5 : i);
     const istHeute = gleich(d, new Date()) ||
-      (i === 5 && tagIndex(new Date()) === 5 && gleich(montagVon(new Date()), mo));
+      (i === 5 && tagIndex(new Date()) === 5 && gleich(mondayOf(new Date()), mo));
     const hat = (i === 5 ? [plusTage(mo,5), plusTage(mo,6)] : [d])
       .flatMap(x => eintraegeAm(x)).filter(e => !e.erledigt);
     const zeichen = [...new Set(hat.map(e => e.typ))].join("");
@@ -692,7 +692,7 @@ function zeichneListe(sel, nixSel, liste, mitNotiz = true){
 
 function zeichneKalender(){
   $("#monatLabel").textContent = kalMonat.toLocaleDateString("de-DE",{month:"long",year:"numeric"});
-  const start = montagVon(new Date(kalMonat.getFullYear(), kalMonat.getMonth(), 1));
+  const start = mondayOf(new Date(kalMonat.getFullYear(), kalMonat.getMonth(), 1));
   let html = ["Mo","Di","Mi","Do","Fr","Sa","So"].map(t => `<div class="wt">${t}</div>`).join("");
   for(let i = 0; i < 42; i++){
     const d = plusTage(start, i);
@@ -847,7 +847,7 @@ function zeichneNoten(){
     `Verhältnis je Fach antippbar. Standard: ${Number(cfg.anteilM)||0} % mündlich.`;
   const liste = alleFaecher().filter(f => notenAktiv().some(n => n.fach === f));
   $("#einListe").innerHTML = liste.map(f => {
-    const sch = notenSchnitt(f), aM = anteilFuer(f);
+    const sch = gradeAverage(f), aM = anteilFuer(f);
     const eigene = notenAktiv().filter(n => n.fach === f).sort((a,b) => b.datum.localeCompare(a.datum));
     return `<li style="display:block;padding:0;border:0"><div class="notenkarte">
       <div class="kopfz">
@@ -925,7 +925,7 @@ function fachReihenfolge(){
 }
 function zeichneZeugnis(){
   const liste = fachReihenfolge();
-  const schnitte = liste.map(f => notenSchnitt(f).gesamt).filter(w => w !== null);
+  const schnitte = liste.map(f => gradeAverage(f).gesamt).filter(w => w !== null);
   const gesamt = schnitte.length ? schnitte.reduce((a,b) => a+b, 0)/schnitte.length : null;
   $("#zeuSchnitt").textContent = gesamt === null ? "" : notenText(gesamt);
   const fehl = errorText();
@@ -934,7 +934,7 @@ function zeichneZeugnis(){
     : "Noch keine Noten. Tippe ein Fach an, um Verhältnis und Zielnote zu setzen.")
     + (fehl ? `  Versäumt: ${fehl}.` : "");
   $("#zeuListe").innerHTML = liste.map(f => {
-    const sch = notenSchnitt(f), ganz = zeugnisNote(sch.gesamt);
+    const sch = gradeAverage(f), ganz = zeugnisNote(sch.gesamt);
     const anzahl = notenAktiv().filter(n => n.fach === f).length;
     return `<button type="button" class="zeuZeile" data-zeufach="${esc(f)}">
       <div class="fachn">${esc(fachName(f))}
@@ -968,7 +968,7 @@ $("#monatPlus").onclick  = () => { kalMonat = new Date(kalMonat.getFullYear(), k
 $("#tage").onclick = e => {
   const b = e.target.closest("[data-tag]"); if(!b) return;
   const i = +b.dataset.tag;
-  gewaehlt = plusTage(montagVon(gewaehlt), i === 5 ? 5 : i); render();
+  gewaehlt = plusTage(mondayOf(gewaehlt), i === 5 ? 5 : i); render();
 };
 $("#kalHeute").onclick = () => {
   kalTag = new Date(); kalMonat = new Date(); gewaehlt = new Date(); render();
@@ -1179,7 +1179,7 @@ function schnellDialog(){
   const s = cfg.slots[offenerBlock];
   $("#schnellTitel").textContent = fachName(fach);
   $("#schnellZeit").textContent = `${s.von} – ${s.bis}`;
-  const naechste = naechsterTagMitFach(gewaehlt, fach.toUpperCase());
+  const naechste = nextDayWithSubject(gewaehlt, fach.toUpperCase());
   $("#bSchnellHAZiel").textContent = naechste
     ? "fällig " + naechste.toLocaleDateString("de-DE",{weekday:"short",day:"2-digit",month:"2-digit"})
     : "kein weiterer Termin";
@@ -1189,7 +1189,7 @@ const schnell = (typ, datum, extra) => { dlgSchnell.close();
   eintragOeffnen(null, datum, typ, schnellFach(), offenerBlock, extra); };
 $("#bSchnellHA").onclick = () => {
   const fach = schnellFach();
-  schnell("H", naechsterTagMitFach(gewaehlt, fach.toUpperCase()) || plusTage(gewaehlt,1));
+  schnell("H", nextDayWithSubject(gewaehlt, fach.toUpperCase()) || plusTage(gewaehlt,1));
 };
 $("#bSchnellNotiz").onclick   = () => schnell("N", gewaehlt);
 $("#bSchnellKlausur").onclick = () => schnell("K", gewaehlt);
@@ -1225,8 +1225,8 @@ function subjectInfo(i){
   ["A","B"].forEach(w => TAGE.forEach(t =>
     (plan[w][t]||[]).forEach(x => { if(x && x.fach.toUpperCase() === k) stunden++; })));
   const proWoche = cfg.zweiWochen ? stunden/2 : stunden;
-  const naechste = naechsterTagMitFach(gewaehlt, k);
-  const sch = notenSchnitt(k);
+  const naechste = nextDayWithSubject(gewaehlt, k);
+  const sch = gradeAverage(k);
   const offen = aktiv().filter(e => !e.erledigt && e.fach === k && (e.typ === "H" || e.typ === "K"));
   const mb = aktiv().filter(e => e.fach === k && e.typ === "M").length;
 
@@ -1312,7 +1312,7 @@ function dateFieldText(){
 function zeichneDatumWahl(){
   const fach = aktuellesFach();
   $("#eMonatLabel").textContent = eMonat.toLocaleDateString("de-DE",{month:"long",year:"numeric"});
-  const start = montagVon(new Date(eMonat.getFullYear(), eMonat.getMonth(), 1));
+  const start = mondayOf(new Date(eMonat.getFullYear(), eMonat.getMonth(), 1));
   let html = ["Mo","Di","Mi","Do","Fr","Sa","So"].map(t => `<div class="wt">${t}</div>`).join("");
   for(let i = 0; i < 42; i++){
     const d = plusTage(start, i);
@@ -1648,7 +1648,7 @@ $("#bAnSpeichern").onclick = () => {
 /* =====================================================================
    Plan einfügen
    ===================================================================== */
-function parseZelle(t){
+function parseCell(t){
   /* Erwartet FACH, RAUM (LEHRKRAFT). Eckige Klammern enthalten oft die Klasse. */
   const m = t.trim().match(/^(.+?),\s*(.+?)\s*([([])(.+?)[)\]]$/);
   if(!m) return null;
@@ -1661,10 +1661,10 @@ function textLesen(text){
   const proStunde = {}; let std = null;
   for(const z of zeilen){
     const kopf = z.match(/^([0-9]{1,2})\s*(.*)$/);
-    if(kopf && (kopf[2] === "" || parseZelle(kopf[2]))){
-      std = kopf[1]; if(kopf[2]) proStunde[std] = parseZelle(kopf[2]); continue;
+    if(kopf && (kopf[2] === "" || parseCell(kopf[2]))){
+      std = kopf[1]; if(kopf[2]) proStunde[std] = parseCell(kopf[2]); continue;
     }
-    const zelle = parseZelle(z);
+    const zelle = parseCell(z);
     if(zelle && std) proStunde[std] = zelle;
   }
   return proStunde;
@@ -1713,13 +1713,13 @@ $("#bImportSpeichern").onclick = () => {
     plan[woche][tag][i] = w.fach ? {fach:w.fach.toUpperCase(), raum:w.raum, lk:w.lk} : null; });
   persistState(); dlgImport.close();
   if(zurueckZuEinst){ zurueckZuEinst = false; render(); einstellungenOeffnen(); return; }
-  ansicht = "tag"; gewaehlt = plusTage(montagVon(gewaehlt), +iTag.value); render();
+  ansicht = "tag"; gewaehlt = plusTage(mondayOf(gewaehlt), +iTag.value); render();
 };
 
 /* =====================================================================
    Profile
    ===================================================================== */
-function profilKnopf(){
+function profileButton(){
   const el = $("#btnProfil"); if(!el) return;
   el.textContent = (profilName().trim()[0] || "P").toUpperCase();
   el.setAttribute("aria-label", "Profil: " + profilName());
@@ -1759,14 +1759,14 @@ $("#pGitter").onclick = e => {
     const id = createId();
     profile.push({id, name:name.trim()}); profilId = id; saveProfiles();
     zustandLaden(); normalize(); persistState();
-    profilVerwalten = false; profilKnopf(); ansicht = "tag";
+    profilVerwalten = false; profileButton(); ansicht = "tag";
     profilAuswahlSchliessen(); render(); return;
   }
   const u = e.target.closest("[data-umbenennen]");
   if(u){
     const x = profile.find(y => y.id === u.dataset.umbenennen);
     const name = prompt("Neuer Name", x.name);
-    if(name && name.trim()){ x.name = name.trim(); saveProfiles(); zeichneProfilAuswahl(); profilKnopf(); }
+    if(name && name.trim()){ x.name = name.trim(); saveProfiles(); zeichneProfilAuswahl(); profileButton(); }
     return;
   }
   const d = e.target.closest("[data-profilweg]");
@@ -1776,12 +1776,12 @@ $("#pGitter").onclick = e => {
     profilSchluessel(x.id).forEach(k => { try{ localStorage.removeItem(k); }catch(e){} });
     profile = profile.filter(y => y.id !== x.id);
     if(profilId === x.id){ profilId = profile[0].id; zustandLaden(); normalize(); }
-    saveProfiles(); profilKnopf(); zeichneProfilAuswahl(); render(); return;
+    saveProfiles(); profileButton(); zeichneProfilAuswahl(); render(); return;
   }
   const w = e.target.closest("[data-wechsel]");
   if(w && !profilVerwalten){
     profilId = w.dataset.wechsel; saveProfiles();
-    zustandLaden(); normalize(); profilKnopf();
+    zustandLaden(); normalize(); profileButton();
     ansicht = "tag"; einSub = null; gewaehlt = new Date();
     profilAuswahlSchliessen(); render();
   }
@@ -2317,7 +2317,7 @@ MA, B006 (SCHM)</pre>
    umschalten. Gebraucht wird die Ansicht, bei der <b>das Fach zuerst</b> steht —
    sonst landen Lehrernamen als Fächer in deinem Plan.</p>
   <p>Passt das Format deiner Schule gar nicht: Der Ausdruck steht in
-   <code>app.js</code> in der Funktion <code>parseZelle</code>.</p>`},
+   <code>app.js</code> in der Funktion <code>parseCell</code>.</p>`},
 
 {id:"abwoche", teil:"Der Stundenplan", titel:"A- und B-Wochen", worte:"wechselwoche gerade ungerade calendarWeek",
  text:`<p>Feste Regel: <b>ungerade Kalenderwoche = A, gerade = B.</b> Welche gerade
@@ -2910,7 +2910,7 @@ function archivHinweisEinstellung(){
 }
 sArchivTage.onchange = archivHinweisEinstellung;
 
-function rhythmusHinweis(){
+function rhythmHint(){
   const tage = Math.max(0, Number(sRhythmus.value) || 0);
   const monate = Math.max(0, Number(sHalten.value) || 0);
   $("#sRhythmusHinweis").textContent = (tage
@@ -2920,8 +2920,8 @@ function rhythmusHinweis(){
       ? ` Im Sicherungsordner bleiben die letzten ${zahl(monate,"Monat","Monate")}; ältere Sicherungen der App werden dort gelöscht.`
       : " Im Sicherungsordner bleibt alles liegen.");
 }
-sRhythmus.onchange = rhythmusHinweis;
-sHalten.onchange = rhythmusHinweis;
+sRhythmus.onchange = rhythmHint;
+sHalten.onchange = rhythmHint;
 
 /* --- Ordner: Anzeige und Knöpfe --- */
 async function ordnerStand(){
@@ -2991,7 +2991,7 @@ function einstellungenOeffnen(){
   sHalten.value = String(Math.max(0, Number(cfg.sicherHalten) || 0));
   if(sHalten.selectedIndex < 0) sHalten.value = "3";
   sAuto.checked = !!cfg.sicherAuto;
-  rhythmusHinweis();
+  rhythmHint();
   $("#sOrdnerGeht").classList.toggle("hidden", !ordnerMoeglich());
   $("#sOrdnerGehtNicht").classList.toggle("hidden", ordnerMoeglich());
   if(ordnerMoeglich()) ordnerLaden().then(ordnerStand);
@@ -3131,7 +3131,7 @@ function alleProfileUebernehmen(liste){
   vorher.filter(id => !neu.some(x => x.id === id))
     .forEach(id => profilSchluessel(id).forEach(k => { try{ localStorage.removeItem(k); }catch(e){} }));
   profile = neu; profilId = neu[0].id; saveProfiles();
-  zustandLaden(); normalize(); persistState(); profilKnopf();
+  zustandLaden(); normalize(); persistState(); profileButton();
   ansicht = "tag"; einSub = null; dlgEinst.close(); render();
 }
 $("#sLaden").onclick = () => {
@@ -3223,7 +3223,7 @@ async function currentVersion(){
     sw.postMessage("version", [kanal.port2]);
   }), 2000);
 }
-async function serverVersion(){
+async function serverVersionText(){
   try{
     const antwort = await mitZeitgrenze(fetch("sw.js", {cache:"no-store"}), 5000);
     if(!antwort) return null;
@@ -3233,7 +3233,7 @@ async function serverVersion(){
   }catch(e){ return null; }
 }
 async function versionPruefen(){
-  const [laeuft, server] = await Promise.all([currentVersion(), serverVersion()]);
+  const [laeuft, server] = await Promise.all([currentVersion(), serverVersionText()]);
   BUILD = laeuft || server || "—";
   const veraltet = laeuft && server && laeuft !== server;
   const w = $("#wischText");
@@ -3307,7 +3307,7 @@ function initApp(){
   themaAnwenden();
   startAnsicht();
   normalize();
-  profilKnopf();
+  profileButton();
   render();
   versionPruefen();
   meldemerkerAufraeumen();
