@@ -6,7 +6,7 @@ name: APK bauen
 
 on:
   push:
-    branches: [main, fix/capacitor-8]
+    branches: [main]
   workflow_dispatch:
 
 jobs:
