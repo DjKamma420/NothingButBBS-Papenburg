@@ -22,20 +22,20 @@ await page.evaluate((b) => {
   sonder = [{id:"s1",datum:iso(new Date()),slot:0,art:"vertretung",titel:b,raum:b,notiz:b,geloescht:false}];
   ferien = [{von:iso(new Date()),bis:iso(new Date()),name:b,typ:"eigen"}];
   profile = [{id:"1",name:b}];
-  sichern(); normalisiere();
+  persistState(); normalize();
 }, BOMBE);
 
 for (const v of ["tag","kalender","zeugnis"]) {
-  await page.evaluate(x => { ansicht=x; zeichne(); }, v);
+  await page.evaluate(x => { ansicht=x; render(); }, v);
   await page.waitForTimeout(120);
 }
 /* Einträge samt aller Unterlisten */
 for (const sub of [null,"H","K","N","E","G","M","F","archiv"]) {
-  await page.evaluate(s => { ansicht="eintraege"; einSub=s; zeichne(); }, sub);
+  await page.evaluate(s => { ansicht="eintraege"; einSub=s; render(); }, sub);
   await page.waitForTimeout(60);
 }
 /* Suche über den Payload */
-await page.evaluate(() => { ansicht="eintraege"; einSub=null; zeichne(); const f=document.getElementById("suchFeld"); f.value="<img"; f.dispatchEvent(new Event("input")); });
+await page.evaluate(() => { ansicht="eintraege"; einSub=null; render(); const f=document.getElementById("suchFeld"); f.value="<img"; f.dispatchEvent(new Event("input")); });
 await page.waitForTimeout(120);
 /* Dialoge, die den Payload anzeigen */
 await page.evaluate(() => { try{ fachInfo(0); }catch(e){} });
@@ -61,7 +61,7 @@ const boese = JSON.stringify({
 await page.evaluate(() => einstellungenOeffnen()); await page.waitForTimeout(200);
 await page.fill("#sDaten", boese);
 await page.click("#sLaden"); await page.waitForTimeout(400);
-await page.evaluate(() => { ["tag","kalender","zeugnis","eintraege"].forEach(v=>{ansicht=v;try{zeichne()}catch(e){}}); });
+await page.evaluate(() => { ["tag","kalender","zeugnis","eintraege"].forEach(v=>{ansicht=v;try{render()}catch(e){}}); });
 await page.waitForTimeout(200);
 const x2 = await page.evaluate(() => window.__x);
 pruef("kein XSS über eingelesene Sicherung", x2 === 0, "window.__x=" + x2);
@@ -92,7 +92,7 @@ pruef("URL-Parameter ansicht nur aus Whitelist", url.boese === false && url.gut 
 const ics = await page.evaluate(() => {
   eintraege = [{id:"i1",typ:"K",fach:"MA",datum:iso(plusTage(new Date(),1)),
     titel:"Hallo\r\nBEGIN:VEVENT\r\nSUMMARY:INJ\r\n=1+2+cmd|' /C calc'!A0",notiz:"x",erledigt:false,geloescht:false}];
-  sichern(); return icsBauen();
+  persistState(); return icsBauen();
 });
 /* Physische Zeilen zählen: eine Injektion erzeugt eine Zeile, die exakt
    BEGIN:VEVENT lautet; Fortsetzungszeilen beginnen mit Leerzeichen. */

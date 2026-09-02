@@ -5,7 +5,7 @@ const { page, browser } = await starte({ geraet:"handy", breite:390, hoehe:850, 
 /* Etwas Plan, damit Knöpfe da sind. */
 await page.evaluate(() => {
   ["MO","DI","MI","DO","FR"].forEach(t => plan.A[t]=[{fach:"MA",raum:"B1",lk:"X"},{fach:"DE",raum:"A2",lk:"Y"},null,null]);
-  cfg.klasse="10b"; sichern(); zeichne();
+  cfg.klasse="10b"; persistState(); render();
 });
 
 /* ---------- ALT / wenig technikaffin ---------- */
@@ -54,7 +54,7 @@ pruef("gedämpfte Schrift erreicht WCAG-AA für Kleintext (≥4.5)", kontrast.ve
       `Verhältnis ${kontrast.verhaeltnis} (${kontrast.muted} auf ${kontrast.bg})`);
 
 /* Tastatur: Eintrag anlegen und speichern ohne Maus/Touch. */
-await page.evaluate(() => { ansicht="tag"; zeichne(); });
+await page.evaluate(() => { ansicht="tag"; render(); });
 await page.focus("#btnEintrag"); await page.keyboard.press("Enter"); await page.waitForTimeout(200);
 const dialogOffen = await page.evaluate(() => document.getElementById("dlgEintrag").open);
 pruef("Eintragsdialog per Tastatur (Enter) erreichbar", dialogOffen === true);
@@ -68,7 +68,7 @@ if (dialogOffen) {
 /* ---------- JUNG / Stress ---------- */
 
 /* Schnelles Doppeltippen auf Speichern darf keinen Doppeleintrag erzeugen. */
-await page.evaluate(() => { eintraege = eintraege.filter(e=>e.titel!=="DOPPEL"); sichern();
+await page.evaluate(() => { eintraege = eintraege.filter(e=>e.titel!=="DOPPEL"); persistState();
   eintragOeffnen(null, new Date(), "N", ""); });
 await page.waitForTimeout(150);
 await page.fill("#eText","DOPPEL");
@@ -81,7 +81,7 @@ pruef("dreifaches Tippen auf Speichern erzeugt genau einen Eintrag", doppel === 
 await page.evaluate(() => {
   eintraege.push({id:"lang",typ:"N",fach:"MA",datum:iso(new Date()),
     titel:"L".repeat(5000), notiz:"Wört ".repeat(2000), erledigt:false,geloescht:false});
-  sichern(); ansicht="tag"; zeichne();
+  persistState(); ansicht="tag"; render();
 });
 await page.waitForTimeout(150);
 const quer = await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1);
@@ -91,7 +91,7 @@ pruef("5000-Zeichen-Titel erzeugt keinen horizontalen Querlauf", quer,
 /* Emoji in Feldern. */
 await page.evaluate(() => {
   eintraege.push({id:"emo",typ:"H",fach:"MA",datum:iso(new Date()),titel:"🎉📚🧪 Test 你好",notiz:"",erledigt:false,geloescht:false});
-  sichern(); ansicht="eintraege"; einSub="H"; zeichne();
+  persistState(); ansicht="eintraege"; einSub="H"; render();
 });
 await page.waitForTimeout(120);
 pruef("Emoji/Unicode im Titel ohne Fehler", (await fehlerkasten(page)) === null);
@@ -100,8 +100,8 @@ pruef("Emoji/Unicode im Titel ohne Fehler", (await fehlerkasten(page)) === null)
 const dauer = await page.evaluate(() => {
   eintraege = []; const h = iso(new Date());
   for (let i=0;i<500;i++) eintraege.push({id:"m"+i,typ:"H",fach:"MA",datum:h,titel:"Aufgabe "+i,notiz:"x",erledigt:false,geloescht:false});
-  sichern();
-  const t0 = performance.now(); ansicht="eintraege"; einSub="H"; zeichne(); return Math.round(performance.now()-t0);
+  persistState();
+  const t0 = performance.now(); ansicht="eintraege"; einSub="H"; render(); return Math.round(performance.now()-t0);
 });
 pruef("500 Einträge rendern in vertretbarer Zeit (<1500ms)", dauer < 1500, dauer + " ms");
 pruef("kein Fehler bei 500 Einträgen", (await fehlerkasten(page)) === null);

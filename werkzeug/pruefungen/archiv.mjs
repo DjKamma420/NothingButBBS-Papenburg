@@ -15,14 +15,14 @@ await page.evaluate(() => {
   ];
   noten = []; sonder = [];
   cfg.archivTage = 0;
-  sichern(); normalisiere(); zeichne();
+  persistState(); normalize(); render();
 });
 
 pruef("Voreinstellung ist „für immer“", (await page.evaluate(() => cfg.archivTage)) === 0);
 
 /* Migration: die Frist darf nicht rückwirkend gelten. */
 const migriert = await page.evaluate(() => {
-  ansicht = "eintraege"; einSub = "archiv"; zeichne();
+  ansicht = "eintraege"; einSub = "archiv"; render();
   return eintraege.filter(e => e.geloescht).map(e => e.geloeschtAm);
 });
 const heute = new Date().toISOString().slice(0, 10);
@@ -41,11 +41,11 @@ pruef("Hinweis ohne Frist nennt keine Löschung", /bis du es selbst entfernst/.t
 pruef("beide Einträge noch da", (await page.evaluate(() => archivListe().length)) === 2);
 
 /* Frist setzen — die alten Einträge dürfen NICHT sofort verschwinden. */
-await page.evaluate(() => { cfg.archivTage = 30; sichern(); normalisiere(); zeichne(); });
+await page.evaluate(() => { cfg.archivTage = 30; persistState(); normalize(); render(); });
 pruef("30-Tage-Frist entfernt frisch Archiviertes nicht",
       (await page.evaluate(() => archivListe().length)) === 2);
 const mitFrist = await page.evaluate(() => {
-  einSub = "archiv"; zeichne(); return document.getElementById("einSubHinweis").textContent; });
+  einSub = "archiv"; render(); return document.getElementById("einSubHinweis").textContent; });
 pruef("Hinweis nennt die Frist", /30 Tage nach dem Löschen endgültig entfernt/.test(mitFrist), mitFrist);
 const zeile = await page.evaluate(() => document.querySelector("#einListe .wann").textContent);
 pruef("Zeile zeigt Restzeit", /noch 30 Tage/.test(zeile), zeile.trim());
@@ -54,7 +54,7 @@ pruef("Zeile zeigt Restzeit", /noch 30 Tage/.test(zeile), zeile.trim());
 const nachAblauf = await page.evaluate(() => {
   eintraege.find(e => e.id === "a1").geloeschtAm = iso(plusTage(new Date(), -31));
   eintraege.find(e => e.id === "a2").geloeschtAm = iso(plusTage(new Date(), -3));
-  sichern(); normalisiere(); zeichne();
+  persistState(); normalize(); render();
   return { übrig: archivListe().map(a => a.id), aktiv: eintraege.some(e => e.id === "a3") };
 });
 pruef("abgelaufener Eintrag ist endgültig weg", !nachAblauf.übrig.includes("a1"), nachAblauf.übrig.join(", "));
@@ -64,7 +64,7 @@ pruef("nicht archivierter Eintrag bleibt unberührt", nachAblauf.aktiv);
 /* Warnung in der letzten Woche */
 const bald = await page.evaluate(() => {
   eintraege.find(e => e.id === "a2").geloeschtAm = iso(plusTage(new Date(), -26));
-  sichern(); normalisiere(); einSub = "archiv"; zeichne();
+  persistState(); normalize(); einSub = "archiv"; render();
   return { hinweis: document.getElementById("einSubHinweis").textContent,
            zeile: document.querySelector("#einListe .wann").textContent };
 });
@@ -84,7 +84,7 @@ pruef("Zurückholen löscht den Zeitpunkt", zurueck.geloescht === false && zurue
 const warnung = await page.evaluate(() => {
   eintraege.push({id:"a4", typ:"N", fach:"", datum:"2026-01-01", titel:"Uralt",
                   geloescht:true, geloeschtAm:iso(plusTage(new Date(), -200))});
-  sichern(); einstellungenOeffnen();
+  persistState(); einstellungenOeffnen();
   document.getElementById("sArchivTage").value = "90";
   archivHinweisEinstellung();
   return document.getElementById("sArchivHinweis").textContent;

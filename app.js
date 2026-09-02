@@ -198,7 +198,7 @@ function zustandLaden(){
   merkblattUmziehen();
   datenMigrieren();
 }
-/* Bis Fassung 3 erledigen normalisiere() und merkblattUmziehen() die
+/* Bis Fassung 3 erledigen normalize() und merkblattUmziehen() die
    Umstellung alter Formen von selbst; hier wird nur festgehalten, worauf
    spätere Schritte aufsetzen. Wichtig ist der umgekehrte Fall: Daten aus
    einer neueren App-Fassung dürfen nicht stillschweigend beschnitten werden. */
@@ -255,7 +255,7 @@ const minuten = s => { const [h,m] = s.split(":").map(Number); return h*60+m; };
 const jetztMin = () => { const n = new Date(); return n.getHours()*60 + n.getMinutes(); };
 
 /* --- Daten pflegen --- */
-function normalisiere(){
+function normalize(){
   ["A","B"].forEach(w => {
     if(!plan[w]) plan[w] = {};
     TAGE.forEach(t => {
@@ -341,7 +341,7 @@ function archivAufraeumen(){
     Speicher.schreib("noten", noten);
   }
 }
-function sichern(){
+function persistState(){
   Speicher.schreib("cfg", cfg); Speicher.schreib("plan", plan);
   Speicher.schreib("eintraege", eintraege); Speicher.schreib("ferien", ferien);
   Speicher.schreib("sonder", sonder); Speicher.schreib("noten", noten);
@@ -363,7 +363,7 @@ const eintraegeAm  = d => aktiv().filter(e => e.datum === iso(d) && e.typ !== "M
 
 function subjects(){
   const s = new Set();
-  /* plan[w] kann fehlen, wenn gelesen wird, bevor normalisiere() lief. */
+  /* plan[w] kann fehlen, wenn gelesen wird, bevor normalize() lief. */
   ["A","B"].forEach(w => TAGE.forEach(t =>
     ((plan[w] && plan[w][t]) || []).forEach(x => x && x.fach && s.add(x.fach))));
   return [...s].sort();
@@ -434,8 +434,8 @@ function themaAnwenden(){
 /* =====================================================================
    Zeichnen
    ===================================================================== */
-function zeichne(){
-  normalisiere();
+function render(){
+  normalize();
   themaAnwenden();
   $("#ansichtTag").classList.toggle("hidden", ansicht !== "tag");
   $("#ansichtKal").classList.toggle("hidden", ansicht !== "kalender");
@@ -584,14 +584,14 @@ function sicherungBanner(){
       : "Letzte Sicherung vor " + zahl(alter,"Tag","Tagen") + "."}
       Löscht der Browser seine Websitedaten, ist ohne Sicherung alles weg.</div>
     <div class="chips" style="margin-top:11px">
-      <button type="button" id="bSicherJetzt">Jetzt sichern</button>
+      <button type="button" id="bSicherJetzt">Jetzt persistState</button>
       <button type="button" id="bSicherSpaeter">Heute nicht</button>
     </div>`;
 }
 $("#sicherBanner").onclick = e => {
   if(e.target.closest("#bSicherJetzt")){ jetztSichern(true); return; }
   if(e.target.closest("#bSicherSpaeter")){
-    Speicher.schreib("sicherSpaeter", iso(new Date())); zeichne();
+    Speicher.schreib("sicherSpaeter", iso(new Date())); render();
   }
 };
 /* Kurze Rückmeldung für Dinge, die von selbst passieren. Was unsichtbar
@@ -787,7 +787,7 @@ function zeichneEintraege(){
       archiv: archivListe().length ? `${archivListe().length} im Archiv` : "leer"
     };
     Object.entries(zaehler).forEach(([k,v]) => { const el = $("#zahl"+k); if(el) el.textContent = v; });
-    suchen();
+    search();
 
     return;
   }
@@ -953,25 +953,25 @@ function zeigeAnsicht(a){
   ansicht = a;
   if(a === "kalender"){ kalMonat = new Date(gewaehlt); kalTag = new Date(gewaehlt); }
   if(a === "eintraege") einSub = null;
-  zeichne();
+  render();
 }
 $("#rTag").onclick = () => zeigeAnsicht("tag");
 $("#rKal").onclick = () => zeigeAnsicht("kalender");
 $("#rEin").onclick = () => zeigeAnsicht("eintraege");
 $("#rZeu").onclick = () => zeigeAnsicht("zeugnis");
-$("#btnEdit").onclick = () => { bearbeiten = !bearbeiten; zeichne(); };
-$("#btnHeute").onclick = () => { gewaehlt = new Date(); zeichne(); };
-$("#wocheZurueck").onclick = () => { gewaehlt = plusTage(gewaehlt,-7); zeichne(); };
-$("#wocheVor").onclick     = () => { gewaehlt = plusTage(gewaehlt, 7); zeichne(); };
-$("#monatMinus").onclick = () => { kalMonat = new Date(kalMonat.getFullYear(), kalMonat.getMonth()-1, 1); zeichne(); };
-$("#monatPlus").onclick  = () => { kalMonat = new Date(kalMonat.getFullYear(), kalMonat.getMonth()+1, 1); zeichne(); };
+$("#btnEdit").onclick = () => { bearbeiten = !bearbeiten; render(); };
+$("#btnHeute").onclick = () => { gewaehlt = new Date(); render(); };
+$("#wocheZurueck").onclick = () => { gewaehlt = plusTage(gewaehlt,-7); render(); };
+$("#wocheVor").onclick     = () => { gewaehlt = plusTage(gewaehlt, 7); render(); };
+$("#monatMinus").onclick = () => { kalMonat = new Date(kalMonat.getFullYear(), kalMonat.getMonth()-1, 1); render(); };
+$("#monatPlus").onclick  = () => { kalMonat = new Date(kalMonat.getFullYear(), kalMonat.getMonth()+1, 1); render(); };
 $("#tage").onclick = e => {
   const b = e.target.closest("[data-tag]"); if(!b) return;
   const i = +b.dataset.tag;
-  gewaehlt = plusTage(montagVon(gewaehlt), i === 5 ? 5 : i); zeichne();
+  gewaehlt = plusTage(montagVon(gewaehlt), i === 5 ? 5 : i); render();
 };
 $("#kalHeute").onclick = () => {
-  kalTag = new Date(); kalMonat = new Date(); gewaehlt = new Date(); zeichne();
+  kalTag = new Date(); kalMonat = new Date(); gewaehlt = new Date(); render();
 };
 /* Doppeltippen selbst erkennen: das eingebaute dblclick-Ereignis bleibt aus,
    weil der erste Klick das Gitter neu zeichnet und der zweite deshalb auf
@@ -983,7 +983,7 @@ $("#gitter").onclick = e => {
   const doppelt = letzterKalTipp.datum === b.dataset.kal && jetzt - letzterKalTipp.zeit < 450;
   letzterKalTipp = {datum: doppelt ? null : b.dataset.kal, zeit: jetzt};
   if(doppelt){ kalMenuOeffnen(b.dataset.kal); return; }
-  kalTag = new Date(b.dataset.kal+"T12:00"); zeichne();
+  kalTag = new Date(b.dataset.kal+"T12:00"); render();
 };
 
 /* Wischen: eine Geste, mehrere Orte */
@@ -1002,24 +1002,24 @@ function wischen(el, beiWisch){
     beiWisch(dx < 0 ? 1 : -1);
   }, {passive:true});
 }
-wischen($("#ansichtTag"), r => { gewaehlt = plusTage(gewaehlt, r); zeichne(); });
-wischen($("#ansichtKal"), r => { kalMonat = new Date(kalMonat.getFullYear(), kalMonat.getMonth()+r, 1); zeichne(); });
-wischen($("#ansichtEin"), () => { if(einSub !== null){ einSub = null; zeichne(); } });
+wischen($("#ansichtTag"), r => { gewaehlt = plusTage(gewaehlt, r); render(); });
+wischen($("#ansichtKal"), r => { kalMonat = new Date(kalMonat.getFullYear(), kalMonat.getMonth()+r, 1); render(); });
+wischen($("#ansichtEin"), () => { if(einSub !== null){ einSub = null; render(); } });
 const ansichtWisch = r => {
-  if(ansicht === "eintraege" && einSub !== null){ einSub = null; zeichne(); return; }
+  if(ansicht === "eintraege" && einSub !== null){ einSub = null; render(); return; }
   const i = ANSICHTEN.indexOf(ansicht);
   zeigeAnsicht(ANSICHTEN[(i + r + ANSICHTEN.length) % ANSICHTEN.length]);
 };
 wischen($("#fuss"), ansichtWisch);
 wischen($("#leerraum"), ansichtWisch);
 $("#wischPunkte").onclick = () => {
-  if(ansicht === "eintraege" && einSub !== null){ einSub = null; zeichne(); return; }
+  if(ansicht === "eintraege" && einSub !== null){ einSub = null; render(); return; }
   const i = ANSICHTEN.indexOf(ansicht);
   zeigeAnsicht(ANSICHTEN[(i+1) % ANSICHTEN.length]);
 };
 /* Tippen neben den Inhalt einer Unterliste führt zurück */
 $("#ansichtEin").addEventListener("click", e => {
-  if(einSub !== null && e.target === $("#ansichtEin")){ einSub = null; zeichne(); }
+  if(einSub !== null && e.target === $("#ansichtEin")){ einSub = null; render(); }
 });
 /* Kalenderfeld gedrückt halten, doppelt antippen oder rechts klicken:
    Auswahl, was an diesem Tag eingetragen werden soll. */
@@ -1093,11 +1093,11 @@ $("#bTagFreiSpeichern").onclick = () => {
   ferien = ferien.filter(f => !(f.typ === "eigen" && tagFreiDatum >= f.von && tagFreiDatum <= f.bis));
   ferien.push({von:tagFreiDatum, bis, name, typ:"eigen"});
   ferien.sort((a,b) => a.von.localeCompare(b.von));
-  sichern(); dlgTagFrei.close(); zeichne();
+  persistState(); dlgTagFrei.close(); render();
 };
 $("#bTagFreiWeg").onclick = () => {
   ferien = ferien.filter(f => !(f.typ === "eigen" && tagFreiDatum >= f.von && tagFreiDatum <= f.bis));
-  sichern(); dlgTagFrei.close(); zeichne();
+  persistState(); dlgTagFrei.close(); render();
 };
 
 /* Dialoge: Tippen auf den Hintergrund schließt */
@@ -1162,11 +1162,11 @@ $("#bBlockSpeichern").onclick = () => {
   const fach = fFach.value.trim().toUpperCase();
   plan[wocheFuer(gewaehlt)][TAGE[tagIndex(gewaehlt)]][offenerBlock] =
     fach ? {fach, raum:fRaum.value.trim(), lk:fLK.value.trim()} : null;
-  sichern(); dlgBlock.close(); zeichne();
+  persistState(); dlgBlock.close(); render();
 };
 $("#bBlockLeeren").onclick = () => {
   plan[wocheFuer(gewaehlt)][TAGE[tagIndex(gewaehlt)]][offenerBlock] = null;
-  sichern(); dlgBlock.close(); zeichne();
+  persistState(); dlgBlock.close(); render();
 };
 
 const schnellFach = () => {
@@ -1204,7 +1204,7 @@ $("#bSchnellAusfall").onclick = () => {
   sonder = sonder.filter(x => !(x.datum === datum && x.slot === offenerBlock));
   sonder.push({id:createId(), datum, slot:offenerBlock, art:"ausfall",
                titel:"Fällt aus", raum:"", notiz:"", geloescht:false});
-  sichern(); zeichne();
+  persistState(); render();
 };
 $("#bSchnellVertretung").onclick = () => {
   dlgSchnell.close(); eintragOeffnen(null, gewaehlt, "E", "", offenerBlock, {art:"vertretung"});
@@ -1252,9 +1252,9 @@ $("#fiInhalt").onclick = e => {
   dlgFach.close();
   kalTag = new Date(b.dataset.zukalender+"T12:00");
   kalMonat = new Date(kalTag);
-  ansicht = "kalender"; zeichne();
+  ansicht = "kalender"; render();
 };
-$("#bFachMerk").onclick = () => { dlgFach.close(); ansicht = "eintraege"; einSub = "M"; zeichne(); };
+$("#bFachMerk").onclick = () => { dlgFach.close(); ansicht = "eintraege"; einSub = "M"; render(); };
 
 /* =====================================================================
    Eintragsdialog — eine Oberfläche für alle Arten
@@ -1463,7 +1463,7 @@ $("#bEintragSpeichern").onclick = () => {
     else if(slot !== null) sonder = sonder.filter(x => !(x.datum === datum && x.slot === slot));
     if(titel) sonder.push({id:createId(), datum, slot, art:ereignisArt, titel,
                            raum:eOrt.value.trim(), notiz:eNotiz.value.trim(), geloescht:false});
-    sichern(); dlgEintrag.close(); zeichne(); return;
+    persistState(); dlgEintrag.close(); render(); return;
   }
   if(t === "G"){
     const wert = parseFloat(String(eWert.value).replace(",", "."));
@@ -1475,7 +1475,7 @@ $("#bEintragSpeichern").onclick = () => {
     const alteNote = noteId && noten.find(x => x.id === noteId);
     if(alteNote) Object.assign(alteNote, nd);
     else noten.push(Object.assign({id:createId(), geloescht:false}, nd));
-    sichern(); dlgEintrag.close(); zeichne(); return;
+    persistState(); dlgEintrag.close(); render(); return;
   }
   if(!fach && t === "M") return alert("Bitte ein Fach wählen.");
   const jetzt = new Date();
@@ -1491,14 +1491,14 @@ $("#bEintragSpeichern").onclick = () => {
   const alter = bearbeiteId && eintraege.find(x => x.id === bearbeiteId);
   if(alter) Object.assign(alter, daten);
   else eintraege.push(Object.assign({id:createId(), erledigt:false, geloescht:false}, daten));
-  sichern(); dlgEintrag.close(); zeichne();
+  persistState(); dlgEintrag.close(); render();
 };
 $("#bEintragWeg").onclick = () => {
   const ziel = ereignisId ? sonder.find(x => x.id === ereignisId)
              : noteId     ? noten.find(x => x.id === noteId)
              :              eintraege.find(x => x.id === bearbeiteId);
   if(ziel) insArchiv(ziel);
-  sichern(); dlgEintrag.close(); zeichne();
+  persistState(); dlgEintrag.close(); render();
 };
 
 /* --- Merkblatt ansehen --- */
@@ -1522,9 +1522,9 @@ function listenKlick(e){
   const hak = e.target.closest("[data-hak]");
   if(hak){
     const it = eintraege.find(x => x.id === hak.dataset.hak);
-    if(!it){ zeichne(); return; }              // in einem anderen Tab entfernt
+    if(!it){ render(); return; }              // in einem anderen Tab entfernt
     it.erledigt = hak.checked; it.erledigtAm = hak.checked ? iso(new Date()) : null;
-    sichern(); zeichne(); return;
+    persistState(); render(); return;
   }
   const schau = e.target.closest("[data-schau]");
   if(schau){ schauOeffnen(schau.dataset.schau); return; }
@@ -1544,7 +1544,7 @@ $("#einListe").addEventListener("click", e => {
     const [art,id] = zurueck.dataset.zurueck.split(":");
     const it = archivFinden(art,id);
     if(it){ ausArchiv(it); if(art === "eintrag"){ it.erledigt = false; it.erledigtAm = null; } }
-    sichern(); zeichne(); return;
+    persistState(); render(); return;
   }
   const weg = e.target.closest("[data-endgueltig]");
   if(weg && confirm("Endgültig löschen? Das lässt sich nicht rückgängig machen.")){
@@ -1552,12 +1552,12 @@ $("#einListe").addEventListener("click", e => {
     if(art === "eintrag") eintraege = eintraege.filter(x => x.id !== id);
     else if(art === "ereignis") sonder = sonder.filter(x => x.id !== id);
     else noten = noten.filter(x => x.id !== id);
-    sichern(); zeichne();
+    persistState(); render();
   }
 });
 $("#einMenu").onclick = e => {
   const b = e.target.closest("[data-sub]"); if(!b) return;
-  einSub = b.dataset.sub; zeichne();
+  einSub = b.dataset.sub; render();
 };
 $("#zeuListe").onclick = e => {
   const b = e.target.closest("[data-zeufach]"); if(!b) return;
@@ -1565,8 +1565,8 @@ $("#zeuListe").onclick = e => {
 };
 
 /* --- Suche --- */
-$("#suchFeld").oninput = suchen;
-function suchen(){
+$("#suchFeld").oninput = search;
+function search(){
   const q = ($("#suchFeld").value || "").trim().toLowerCase();
   const ul = $("#suchListe");
   $("#einKacheln").classList.toggle("hidden", q.length > 0);
@@ -1637,12 +1637,12 @@ function zielRechnen(){
 anZiel.oninput = zielRechnen; anZielArt.onchange = zielRechnen;
 $("#bAnStandard").onclick = () => {
   if(cfg.anteile) delete cfg.anteile[anteilFach];
-  sichern(); dlgAnteil.close(); zeichne();
+  persistState(); dlgAnteil.close(); render();
 };
 $("#bAnSpeichern").onclick = () => {
   if(!cfg.anteile) cfg.anteile = {};
   cfg.anteile[anteilFach] = Math.max(0, Math.min(100, Number(anWert.value) || 0));
-  sichern(); dlgAnteil.close(); zeichne();
+  persistState(); dlgAnteil.close(); render();
 };
 
 /* =====================================================================
@@ -1711,9 +1711,9 @@ $("#bImportSpeichern").onclick = () => {
   const woche = cfg.zweiWochen ? iWoche.value : "A", tag = TAGE[+iTag.value];
   importAuslesen().forEach((w,i) => {
     plan[woche][tag][i] = w.fach ? {fach:w.fach.toUpperCase(), raum:w.raum, lk:w.lk} : null; });
-  sichern(); dlgImport.close();
-  if(zurueckZuEinst){ zurueckZuEinst = false; zeichne(); einstellungenOeffnen(); return; }
-  ansicht = "tag"; gewaehlt = plusTage(montagVon(gewaehlt), +iTag.value); zeichne();
+  persistState(); dlgImport.close();
+  if(zurueckZuEinst){ zurueckZuEinst = false; render(); einstellungenOeffnen(); return; }
+  ansicht = "tag"; gewaehlt = plusTage(montagVon(gewaehlt), +iTag.value); render();
 };
 
 /* =====================================================================
@@ -1758,9 +1758,9 @@ $("#pGitter").onclick = e => {
     if(!name || !name.trim()) return;
     const id = createId();
     profile.push({id, name:name.trim()}); profilId = id; saveProfiles();
-    zustandLaden(); normalisiere(); sichern();
+    zustandLaden(); normalize(); persistState();
     profilVerwalten = false; profilKnopf(); ansicht = "tag";
-    profilAuswahlSchliessen(); zeichne(); return;
+    profilAuswahlSchliessen(); render(); return;
   }
   const u = e.target.closest("[data-umbenennen]");
   if(u){
@@ -1775,15 +1775,15 @@ $("#pGitter").onclick = e => {
     if(!confirm(`Profil \u201e${x.name}\u201c mit allen Daten löschen? Das lässt sich nicht rückgängig machen.`)) return;
     profilSchluessel(x.id).forEach(k => { try{ localStorage.removeItem(k); }catch(e){} });
     profile = profile.filter(y => y.id !== x.id);
-    if(profilId === x.id){ profilId = profile[0].id; zustandLaden(); normalisiere(); }
-    saveProfiles(); profilKnopf(); zeichneProfilAuswahl(); zeichne(); return;
+    if(profilId === x.id){ profilId = profile[0].id; zustandLaden(); normalize(); }
+    saveProfiles(); profilKnopf(); zeichneProfilAuswahl(); render(); return;
   }
   const w = e.target.closest("[data-wechsel]");
   if(w && !profilVerwalten){
     profilId = w.dataset.wechsel; saveProfiles();
-    zustandLaden(); normalisiere(); profilKnopf();
+    zustandLaden(); normalize(); profilKnopf();
     ansicht = "tag"; einSub = null; gewaehlt = new Date();
-    profilAuswahlSchliessen(); zeichne();
+    profilAuswahlSchliessen(); render();
   }
 };
 
@@ -1822,7 +1822,7 @@ $("#sFerienLaden").onclick = async () => {
   try{
     const eigene = ferien.filter(f => f.typ === "eigen");   // selbst eingetragene behalten
     ferien = [...await ferienLaden(land), ...eigene].sort((a,b) => a.von.localeCompare(b.von));
-    cfg.land = land; sichern(); ferienStand(); zeichne();
+    cfg.land = land; persistState(); ferienStand(); render();
   }catch(err){
     $("#sFerienStand").textContent = (err && err.name === "AbortError")
       ? "Der Dienst antwortet nicht. Später noch einmal versuchen."
@@ -1831,7 +1831,7 @@ $("#sFerienLaden").onclick = async () => {
 };
 $("#sFerienWeg").onclick = () => {
   ferien = ferien.filter(f => f.typ === "eigen");
-  sichern(); ferienStand(); zeichne();
+  persistState(); ferienStand(); render();
 };
 function ferienStand(){
   const eigene = ferien.filter(f => f.typ === "eigen").length;
@@ -2248,7 +2248,7 @@ const HILFE = [
   <p class="hWarn"><b>Das Wichtigste:</b> Alle Daten liegen ausschließlich im Speicher
    deines Browsers. Es gibt keinen Server, kein Konto, keine Wiederherstellung.
    Löschst du die Websitedaten, ist alles weg — auch der Entwickler kann nichts
-   zurückholen. Deshalb: regelmäßig sichern (siehe <i>Sicherung</i>).</p>`},
+   zurückholen. Deshalb: regelmäßig persistState (siehe <i>Sicherung</i>).</p>`},
 
 {id:"installieren", teil:"Erste Schritte", titel:"Auf den Startbildschirm legen", worte:"installieren pwa app icon homescreen",
  text:`<p>Die App läuft im Browser, lässt sich aber wie eine richtige App ablegen.
@@ -2400,7 +2400,7 @@ MA = Mathematik</pre>
   <p>Einzelnes Antippen wählt weiterhin nur den Tag aus — darunter erscheint, was
    an ihm ansteht.</p>`},
 
-{id:"suchen", teil:"Täglich benutzen", titel:"Suchen", worte:"finden filter",
+{id:"search", teil:"Täglich benutzen", titel:"Suchen", worte:"finden filter",
  text:`<p>Im Reiter <b>Einträge</b> ganz oben. Gesucht wird über Fach, Titel, Notiz
    und Raum — bei Ereignissen, Noten, Hausaufgaben, Klausuren, Notizen und
    Merkblättern gleichzeitig.</p>
@@ -2486,7 +2486,7 @@ MA = Mathematik</pre>
    grau dargestellt wie Ferien und <b>überleben ein erneutes Laden</b> der
    offiziellen Termine.</p>`},
 
-{id:"warumsichern", teil:"Sicherung", titel:"Warum du sichern musst", worte:"datenverlust backup verloren",
+{id:"warumsichern", teil:"Sicherung", titel:"Warum du persistState musst", worte:"datenverlust backup verloren",
  text:`<p class="hWarn">Deine Daten liegen nur auf diesem Gerät. Das heißt konkret:</p>
   <ul>
    <li>Löschst du in Chrome die <b>Cookies und Websitedaten</b>, ist der komplette
@@ -2502,8 +2502,8 @@ MA = Mathematik</pre>
 {id:"sichernwie", teil:"Sicherung", titel:"Sichern und wieder einlesen", worte:"datei json export import teilen",
  text:`<p>⚙ → <b>Sicherung</b>:</p>
   <ul>
-   <li><b>Als Datei sichern</b> — eine JSON-Datei dieses Profils in die Downloads.</li>
-   <li><b>Alle Profile sichern</b> — eine einzige Datei für das ganze Gerät.
+   <li><b>Als Datei persistState</b> — eine JSON-Datei dieses Profils in die Downloads.</li>
+   <li><b>Alle Profile persistState</b> — eine einzige Datei für das ganze Gerät.
      Erscheint erst ab zwei Profilen.</li>
    <li><b>Teilen</b> — über das System-Teilen-Menü, etwa an dich selbst per Mail.
      Kann das Gerät keine Dateien teilen, landet die Sicherung in der
@@ -2520,14 +2520,14 @@ MA = Mathematik</pre>
 {id:"ordner", teil:"Sicherung", titel:"Sicherungsordner und Automatik", worte:"automatisch ordner rhythmus erinnerung haltefrist",
  text:`<p><b>Am Rechner (Chrome, Edge):</b> ⚙ → <b>Sicherungsordner</b> → einmal einen
    Ordner wählen. Danach legt die App ihre Sicherungen immer dort ab, ohne zu
-   fragen. Mit dem Häkchen <i>Beim Öffnen automatisch sichern</i> passiert das von
+   fragen. Mit dem Häkchen <i>Beim Öffnen automatisch persistState</i> passiert das von
    selbst, sobald es fällig ist.</p>
   <p><b>Haltefrist:</b> Im Ordner bleiben die letzten 1, 3, 6 oder 12 Monate.
    Ältere Sicherungen räumt die App weg — aber <b>nur ihre eigenen</b>, erkennbar
    am Namensmuster. Fremde Dateien im Ordner bleiben unangetastet.</p>
   <p><b>Rhythmus:</b> ⚙ → <i>Erinnerung</i> → alle 7, 14, 28 Tage, alle 3 Monate
    oder nie. Ist es fällig, erscheint oben in der Tagesansicht ein Banner mit
-   <i>Jetzt sichern</i> und <i>Heute nicht</i>.</p>
+   <i>Jetzt persistState</i> und <i>Heute nicht</i>.</p>
   <p class="hHinweis"><b>Auf dem Handy gibt es die Ordnerwahl nicht</b> — kein
    mobiler Browser kann eine Seite dauerhaft in einen Ordner schreiben lassen.
    Sicherungen gehen dort in die Downloads. Willst du sie sortiert haben, schalte
@@ -2598,10 +2598,10 @@ MA = Mathematik</pre>
   <p>In <code>cfg.fassung</code> steht der <b>Datenstand</b>. Trifft eine ältere App
    auf neuere Daten, sagt sie das, statt sie stillschweigend zu beschneiden.</p>`},
 
-{id:"zeichnen", teil:"Technik: wie es funktioniert", titel:"Wie die Anzeige entsteht", worte:"rendern zeichne neu aufbauen",
+{id:"zeichnen", teil:"Technik: wie es funktioniert", titel:"Wie die Anzeige entsteht", worte:"rendern render neu aufbauen",
  text:`<p>Es gibt kein Framework und keine Datenbindung. Nach jeder Änderung läuft
-   eine Funktion <code>zeichne()</code>, die den sichtbaren Bereich komplett neu
-   aufbaut. Davor räumt <code>normalisiere()</code> die Daten auf: fehlende Felder
+   eine Funktion <code>render()</code>, die den sichtbaren Bereich komplett neu
+   aufbaut. Davor räumt <code>normalize()</code> die Daten auf: fehlende Felder
    ergänzen, Fächer großschreiben, abgehakte Aufgaben nach sieben Tagen archivieren.</p>
   <p>Das ist absichtlich stumpf. Der gesamte Zustand steht in wenigen Variablen,
    und jede Ansicht ist eine reine Funktion davon — es gibt keinen Zwischenzustand,
@@ -2688,9 +2688,9 @@ MA = Mathematik</pre>
    <tr><th>Beobachtung</th><th>Ursache und Abhilfe</th></tr>
    <tr><td>Plan ist leer</td><td>Anderes Profil aktiv? Buchstabe oben rechts prüfen.</td></tr>
    <tr><td>Alles weg</td><td>Websitedaten gelöscht oder Speicher vom System geräumt. Ohne Sicherung nicht wiederherstellbar.</td></tr>
-   <tr><td>„Speicher voll“</td><td>Bilder aus alten Merkblättern entfernen, vorher sichern.</td></tr>
+   <tr><td>„Speicher voll“</td><td>Bilder aus alten Merkblättern entfernen, vorher persistState.</td></tr>
    <tr><td>Keine Erinnerungen</td><td>Berechtigung unter ⚙ prüfen. Auf dem iPhone nur, wenn die App auf dem Startbildschirm liegt. Verlässlich ist der Kalender-Export.</td></tr>
-   <tr><td>Neue Fassung kommt nicht</td><td>⚙ → <i>Nach Update suchen</i>, sonst App schließen und neu öffnen.</td></tr>
+   <tr><td>Neue Fassung kommt nicht</td><td>⚙ → <i>Nach Update search</i>, sonst App schließen und neu öffnen.</td></tr>
    <tr><td>Ferien laden schlägt fehl</td><td>Internet prüfen. Antwortet der Dienst nicht, bricht die App nach 15 Sekunden ab und sagt es.</td></tr>
    <tr><td>Fach doppelt im Zeugnis</td><td>Sollte nicht mehr vorkommen; Fächer werden beim Öffnen vereinheitlicht. Sonst melden.</td></tr>
   </table>`}
@@ -3018,7 +3018,7 @@ $("#sWocheKopieren").onclick = e => {
   if(!confirm(`Die ${nach}-Woche wird vollständig durch die ${von}-Woche ersetzt. Fortfahren?`)) return;
   TAGE.forEach(t => plan[nach][t] = ((plan[von] && plan[von][t]) || [])
     .map(x => x ? Object.assign({}, x) : null));
-  sichern(); zeichne();
+  persistState(); render();
   $("#sWocheStand").textContent = `${von}-Woche in die ${nach}-Woche übernommen.`;
 };
 $("#slotEditor").onclick = e => {
@@ -3069,7 +3069,7 @@ function sicherungNotiert(){
   cfg.letzteSicherung = heute;
   try{ localStorage.setItem("sicherungZuletzt", heute); }catch(e){}
   Speicher.entferne("sicherSpaeter");      // erledigt ist nicht vertagt
-  sichern(); sicherungStand(); zeichne();
+  persistState(); sicherungStand(); render();
 }
 $("#sDatei").onclick = () => {
   downloadFile(sicherungsText(), `stundenplan-${dateiName()}-${iso(new Date())}.json`, "application/json");
@@ -3131,8 +3131,8 @@ function alleProfileUebernehmen(liste){
   vorher.filter(id => !neu.some(x => x.id === id))
     .forEach(id => profilSchluessel(id).forEach(k => { try{ localStorage.removeItem(k); }catch(e){} }));
   profile = neu; profilId = neu[0].id; saveProfiles();
-  zustandLaden(); normalisiere(); sichern(); profilKnopf();
-  ansicht = "tag"; einSub = null; dlgEinst.close(); zeichne();
+  zustandLaden(); normalize(); persistState(); profilKnopf();
+  ansicht = "tag"; einSub = null; dlgEinst.close(); render();
 }
 $("#sLaden").onclick = () => {
   let d;
@@ -3157,7 +3157,7 @@ $("#sLaden").onclick = () => {
   if(teil.ferien)    ferien    = teil.ferien;
   if(teil.sonder)    sonder    = teil.sonder;
   if(teil.noten)     noten     = teil.noten;
-  normalisiere(); sichern(); dlgEinst.close(); zeichne();
+  normalize(); persistState(); dlgEinst.close(); render();
 };
 $("#sReset").onclick = () => {
   if(!confirm("Plan, Einträge, Noten, Merkblätter und Archiv dieses Profils löschen?")) return;
@@ -3166,7 +3166,7 @@ $("#sReset").onclick = () => {
   profilSchluessel(profilId).forEach(k => { try{ localStorage.removeItem(k); }catch(e){} });
   Speicher.puffer = {};
   cfg = Object.assign({}, STANDARD); plan = {}; eintraege = []; ferien = []; sonder = []; noten = [];
-  normalisiere(); sichern(); dlgEinst.close(); zeichne();
+  normalize(); persistState(); dlgEinst.close(); render();
 };
 $("#sUpdate").onclick = async () => {
   const s = await versionPruefen();
@@ -3175,7 +3175,7 @@ $("#sUpdate").onclick = async () => {
 };
 $("#bEinstSpeichern").onclick = () => {
   const neu = slotsAuslesen();
-  /* normalisiere() kürzt den Plan hart auf die Zahl der Zeilen. Das ist
+  /* normalize() kürzt den Plan hart auf die Zahl der Zeilen. Das ist
      richtig — aber nicht kommentarlos, wenn dort noch Unterricht steht. */
   if(neu.length && neu.length < cfg.slots.length){
     let verlust = 0;
@@ -3205,7 +3205,7 @@ $("#bEinstSpeichern").onclick = () => {
   cfg.sicherAuto = sAuto.checked;
   cfg.reiheEin = reiheEinListe.slice();
   cfg.reiheFach = reiheFachListe.slice();
-  normalisiere(); sichern(); dlgEinst.close(); zeichne();
+  normalize(); persistState(); dlgEinst.close(); render();
 };
 
 /* =====================================================================
@@ -3270,10 +3270,10 @@ function startAnsicht(){
 let letzterTag = iso(new Date());
 setInterval(() => {
   const jetzt = iso(new Date());
-  if(jetzt !== letzterTag){ letzterTag = jetzt; gewaehlt = new Date(); zeichne(); }
+  if(jetzt !== letzterTag){ letzterTag = jetzt; gewaehlt = new Date(); render(); }
   else if(ansicht === "tag") { zeichneFortschritt(); $("#countdown").textContent = countdownText(); }
 }, 30000);
-document.addEventListener("visibilitychange", () => { if(!document.hidden) zeichne(); });
+document.addEventListener("visibilitychange", () => { if(!document.hidden) render(); });
 /* Zwei offene Tabs auf demselben Profil schrieben sich bisher gegenseitig
    ganze Listen tot. Ändert der andere Tab etwas, hier neu einlesen. */
 window.addEventListener("storage", e => {
@@ -3281,7 +3281,7 @@ window.addEventListener("storage", e => {
   if(e.key === "profile" || e.key === "profilAktiv"){ location.reload(); return; }
   const vorne = "p" + profilId + "_";
   if(!e.key.startsWith(vorne) || !DATEN.includes(e.key.slice(vorne.length))) return;
-  zustandLaden(); normalisiere(); zeichne();
+  zustandLaden(); normalize(); render();
 });
 
 /* Ohne <dialog> läuft hier fast nichts: jeder Eintrag, jede Einstellung
@@ -3298,7 +3298,7 @@ function browserPruefen(){
   return false;
 }
 
-function starten(){
+function initApp(){
   if(!cfg || !Array.isArray(cfg.slots) || !cfg.slots.length){
     cfg = Object.assign({}, STANDARD, cfg || {});
     cfg.slots = STANDARD.slots.slice();
@@ -3306,9 +3306,9 @@ function starten(){
   browserPruefen();
   themaAnwenden();
   startAnsicht();
-  normalisiere();
+  normalize();
   profilKnopf();
-  zeichne();
+  render();
   versionPruefen();
   meldemerkerAufraeumen();
   erinnerungenPruefen().catch(() => {});
@@ -3318,6 +3318,6 @@ function starten(){
   const wann = cfg.startProfil || "immer";
   if(wann === "immer" || (wann === "mehrere" && profile.length > 1)) profilAuswahlZeigen(false);
 }
-try{ starten(); }
+try{ initApp(); }
 catch(e){ showError(e.message, (e.stack||"").split("\n")[1] || ""); }
 if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
