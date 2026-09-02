@@ -1,0 +1,69 @@
+name: Phase 3 step 1
+on:
+  push:
+    branches: [feature/englischer-code-v2]
+    paths: ['.github/workflows/phase3-step1.yml']
+permissions:
+  contents: write
+jobs:
+  rename:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rename only JavaScript identifier tokens
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const file = 'app.js';
+          let s = fs.readFileSync(file, 'utf8');
+          const map = new Map([
+            ['zeigeFehler', 'showError'],
+            ['umgebung', 'environment'],
+            ['knopf', 'button'],
+            ['neueId', 'createId'],
+            ['profileSichern', 'saveProfiles']
+          ]);
+          const isId = c => /[A-Za-z0-9_$]/.test(c || '');
+          const isStart = c => /[A-Za-z_$]/.test(c || '');
+          const out = [];
+          let i = 0;
+          while (i < s.length) {
+            const c = s[i], n = s[i+1];
+            if (c === '/' && n === '/') {
+              const j = s.indexOf('\n', i + 2); out.push(s.slice(i, j < 0 ? s.length : j)); i = j < 0 ? s.length : j; continue;
+            }
+            if (c === '/' && n === '*') {
+              const j = s.indexOf('*/', i + 2); const end = j < 0 ? s.length : j + 2; out.push(s.slice(i, end)); i = end; continue;
+            }
+            if (c === '"' || c === "'") {
+              const q = c; let j = i + 1;
+              while (j < s.length) { if (s[j] === '\\') j += 2; else if (s[j] === q) { j++; break; } else j++; }
+              out.push(s.slice(i, j)); i = j; continue;
+            }
+            if (isStart(c)) {
+              let j = i + 1; while (j < s.length && isId(s[j])) j++;
+              const word = s.slice(i, j); out.push(map.get(word) || word); i = j; continue;
+            }
+            out.push(c); i++;
+          }
+          const next = out.join('');
+          if (next === s) throw new Error('No identifier changed');
+          fs.writeFileSync(file, next);
+          NODE
+      - name: Validate
+        run: node werkzeug/pruefen.mjs
+      - name: Show focused diff
+        run: git diff HEAD -- app.js index.html | sed -n '1,260p'
+      - name: Commit result
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app.js
+          git commit -m 'refactor: rename first phase 3 identifiers safely'
+          git push
+      - name: Remove temporary workflow
+        if: always()
+        run: |
+          git rm .github/workflows/phase3-step1.yml || true
+          git commit -m 'chore: remove temporary phase 3 runner' || true
+          git push || true
