@@ -7,12 +7,12 @@ const index = fs.readFileSync(path.join(root, "index.html"), "utf8");
 const app = fs.readFileSync(path.join(root, "app.js"), "utf8");
 
 function localPath(value) {
-  if (/^(?:[a-z]+:|\\/|#)/i.test(value)) return null;
+  if (/^(?:[a-z]+:|\/|#)/i.test(value)) return null;
   const clean = value.split("#", 1)[0].split("?", 1)[0];
   if (clean === "." || clean === "./") return "./index.html";
   if (clean.startsWith("./")) return clean;
   // HTML/JS references without ./ are relative to the application root.
-  if (/^[A-Za-z0-9._-]+(?:\\/[A-Za-z0-9._-]+)*\\.[A-Za-z0-9]{1,8}$/.test(clean)) return `./${clean}`;
+  if (/^[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*\.[A-Za-z0-9]{1,20}$/.test(clean)) return `./${clean}`;
   return null;
 }
 
