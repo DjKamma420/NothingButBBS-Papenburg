@@ -139,9 +139,11 @@ section{margin-top:30px}
   max-width:min(90vw,420px);text-align:center;word-break:break-word}
 
 /* Kalender */
-/* Drei gleich gewichtete Spalten: der Titel steht damit wirklich in der
-   Mitte und nicht dort, wo die Knöpfe rechts zufällig Platz lassen. */
-.monat{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;margin-bottom:12px}
+/* Bare 1fr ist minmax(auto,1fr): die Spalte darf nicht unter den Inhalt
+   schrumpfen. Die rechte Seite (Pfeil + „Heute") ist breiter als die linke
+   (nur ein Pfeil) und zog den Titel deshalb aus der Mitte — dieser Fork
+   wurde vor dem entsprechenden Fix in StundenplanNothing (v42) erstellt. */
+.monat{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:8px;margin-bottom:12px}
 .monat .mLinks{display:flex;gap:8px;justify-content:flex-start}
 .monat .mRechts{display:flex;gap:8px;justify-content:flex-end}
 .monat b{text-align:center;white-space:nowrap}
