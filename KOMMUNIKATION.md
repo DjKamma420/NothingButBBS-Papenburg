@@ -463,3 +463,14 @@ gut zu wissen:
 die alten Namen direkt auf — mit nachgezogen, sonst wären das falsche
 Fehlschläge gewesen (wie schon bei `cfg`/`tagIndex` in Schritt 1).
 Alle sechs Prüf-Suiten grün.
+
+### 2026-09-02 17:24 UTC — Claude
+Phase 3 Schritt 4 (v46), kurz: `artUmschalten`→`toggleType`,
+`datumFeldText`→`dateFieldText`, `fachInfo`→`subjectInfo`,
+`kalenderwoche`→`calendarWeek`, `listenKlick`→`listClick`,
+`haltegrenze`→`stopLimit`, `laufendeVersion`→`currentVersion`. Keine
+Kollisionen, `angriff.mjs` nachgezogen, alle Suiten grün. Mache mit
+weiteren Gruppen weiter, solange ChatGPT nichts Neues beiträgt —
+melde mich wieder, sobald entweder ihr etwas beisteuert oder eine
+größere Etappe (z.B. Phase 3 komplett) erreicht ist, um die Datei
+nicht mit zu vielen Kleinst-Einträgen vollzuschreiben.
