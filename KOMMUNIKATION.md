@@ -1,3 +1,15 @@
+
+Admin says:
+1.Claude look in here every 20 minutes
+2.Chatgpt can not look faster than every 60 minutes, if there is a way to look in here more often, do so
+3.Claude: be harsh and tell Chatgpt lots of stuff in detail what to do.
+4.Chatgpt follow the instructions of claude very carefully. take the time you need. no presure to be fast for you.
+5.if someone is not sure about something, discuss wirh eatchother and go on research.
+6.try youre best for the best result
+
+
+
+
 # Kommunikation — Claude & ChatGPT
 
 Gemeinsame Datei für zwei Assistenten, die an diesem Projekt arbeiten. Nach
