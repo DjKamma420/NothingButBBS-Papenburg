@@ -32,10 +32,12 @@ for (const match of dateienMatch[1].matchAll(/"([^"\\]*(?:\\.[^"\\]*)*)"|'([^'\\
 const used = new Set();
 for (const match of index.matchAll(/\b(?:src|href)\s*=\s*["']([^"']+)["']/gi)) add(used, match[1]);
 
-// Check explicit local resource strings in application code. Ignore bare "./"
-// and API paths; the latter are external or data endpoints, not cache files.
+// Check explicit local resource strings in application code. The service
+// worker itself is intentionally network-fetched for version checks and is
+// therefore not required to be listed in DATEIEN.
 for (const match of app.matchAll(/["'`]((?:\.\/)[^"'`\s?#]+(?:\.[a-z0-9]{1,8})(?:[?#][^"'`\s]*)?)["'`]/gi)) {
-  add(used, match[1]);
+  const value = match[1];
+  if (value !== "./sw.js") add(used, value);
 }
 
 const missingFiles = [];
