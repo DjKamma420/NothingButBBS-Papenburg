@@ -6,7 +6,7 @@
    ===================================================================== */
 
 /* --- Fehleranzeige zuerst: eine leere Seite sagt niemandem etwas --- */
-function zeigeFehler(text, quelle){
+function showError(text, quelle){
   try{
     let k = document.getElementById("fehlerkasten");
     if(!k){
@@ -18,24 +18,24 @@ function zeigeFehler(text, quelle){
         + "white-space:pre-wrap;max-height:52vh;overflow:auto";
       (document.body || document.documentElement).appendChild(k);
     }
-    let umgebung = "";
+    let environment = "";
     try{
-      umgebung = "\n" + (typeof BUILD === "string" ? BUILD : "?")
+      environment = "\n" + (typeof BUILD === "string" ? BUILD : "?")
         + " · " + (navigator.language || "?")
         + " · " + (screen.width + "×" + screen.height)
         + " · " + navigator.userAgent.slice(0, 120);
     }catch(e){}
-    k.textContent = "Fehler\n" + text + (quelle ? "\n" + quelle : "") + umgebung
+    k.textContent = "Fehler\n" + text + (quelle ? "\n" + quelle : "") + environment
       + "\n\nBitte diesen Text weitergeben. Deine Daten sind nicht betroffen.";
     /* Wer hier steht, kommt sonst nicht weiter. Die häufigste Ursache ist eine
        halb erneuerte Fassung — neues index.html, altes app.js. Ein Neuladen
        ohne Zwischenspeicher behebt genau das. Der Speicher bleibt unberührt. */
-    const knopf = document.createElement("button");
-    knopf.textContent = "App neu laden";
-    knopf.style.cssText = "margin-top:12px;font:inherit;background:#fff;color:#e5382b;"
+    const button = document.createElement("button");
+    button.textContent = "App neu laden";
+    button.style.cssText = "margin-top:12px;font:inherit;background:#fff;color:#e5382b;"
       + "border:0;border-radius:8px;padding:9px 14px;font-weight:700";
-    knopf.onclick = async () => {
-      knopf.textContent = "Lädt …";
+    button.onclick = async () => {
+      button.textContent = "Lädt …";
       try{
         if(window.caches) for(const name of await caches.keys()) await caches.delete(name);
         if("serviceWorker" in navigator){
@@ -45,15 +45,15 @@ function zeigeFehler(text, quelle){
       }catch(e){}
       location.reload();
     };
-    k.appendChild(knopf);
+    k.appendChild(button);
   }catch(e){}
 }
 window.addEventListener("error", e => {
   const datei = (e.filename || "").split("/").pop();
-  zeigeFehler(e.message, datei ? `${datei}, Zeile ${e.lineno}` : "");
+  showError(e.message, datei ? `${datei}, Zeile ${e.lineno}` : "");
 });
 window.addEventListener("unhandledrejection", e =>
-  zeigeFehler("Unerledigt: " + ((e.reason && e.reason.message) || e.reason)));
+  showError("Unerledigt: " + ((e.reason && e.reason.message) || e.reason)));
 
 /* Fassung der Daten im Speicher — nicht die der App. Sie steigt nur, wenn
    sich die Form der gespeicherten Daten ändert, und gibt späteren
@@ -129,14 +129,14 @@ const EREIGNISARTEN = ["ereignis","ausfall","vertretung"];
 const ARTLANG = {H:"Hausaufgaben",K:"Klausuren",N:"Notizen",E:"Ereignisse",
                  G:"Noten",M:"Merkblätter",F:"Fehlzeiten",archiv:"Archiv"};
 
-/* Date.now() allein kollidiert, sobald zwei Einträge in derselben
+/* Date.now() allein kollidiert, sobald pad2 Einträge in derselben
    Millisekunde entstehen — beim Einlesen einer Sicherung passiert genau das. */
-const neueId = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
 
 /* --- Speicher, an das aktive Profil gebunden --- */
 const Speicher = {
   puffer:{},
-  pfad(k){ return "p" + profilId + "_" + k; },
+  pfad(k){ return "p" + profileId + "_" + k; },
   lies(k, standard){
     try{ const v = localStorage.getItem(this.pfad(k)); return v ? JSON.parse(v) : standard; }
     catch(e){ return k in this.puffer ? this.puffer[k] : standard; }
@@ -144,7 +144,7 @@ const Speicher = {
   schreib(k, v){
     this.puffer[k] = v;
     try{ localStorage.setItem(this.pfad(k), JSON.stringify(v)); }
-    catch(e){ zeigeFehler("Speicher voll. Lösche Bilder aus Merkblättern oder lege eine Sicherung an."); }
+    catch(e){ showError("Speicher voll. Lösche Bilder aus Merkblättern oder lege eine Sicherung an."); }
   },
   entferne(k){
     delete this.puffer[k];
@@ -153,119 +153,119 @@ const Speicher = {
 };
 /* Alle Schlüssel eines Profils — auch die, die nicht in DATEN stehen
    (etwa die Tagesmerker der Erinnerung). */
-function profilSchluessel(id){
+function profileKeys(id){
   try{ return Object.keys(localStorage).filter(k => k.startsWith("p" + id + "_")); }
   catch(e){ return DATEN.map(k => "p" + id + "_" + k); }
 }
 
-const DATEN = ["cfg","plan","eintraege","ferien","sonder","noten","merkblatt"];
-let profile = [], profilId = "1";
-function profileSichern(){
+const DATEN = ["config","plan","eintraege","ferien","sonder","noten","merkblatt"];
+let profile = [], profileId = "1";
+function saveProfiles(){
   try{
     localStorage.setItem("profile", JSON.stringify(profile));
-    localStorage.setItem("profilAktiv", profilId);
+    localStorage.setItem("activeProfile", profileId);
   }catch(e){}
 }
-function profileLaden(){
+function loadProfiles(){
   try{
     profile = JSON.parse(localStorage.getItem("profile") || "[]");
-    profilId = localStorage.getItem("profilAktiv") || "1";
+    profileId = localStorage.getItem("activeProfile") || "1";
   }catch(e){ profile = []; }
   if(!Array.isArray(profile) || !profile.length){
     const alt = DATEN.some(k => { try{ return localStorage.getItem(k) !== null; }catch(e){ return false; } });
     profile = [{id:"1", name: alt ? "Mein Plan" : "Profil 1"}];
-    profilId = "1";
+    profileId = "1";
     if(alt) DATEN.forEach(k => { try{
       const v = localStorage.getItem(k);
       if(v !== null){ localStorage.setItem("p1_" + k, v); localStorage.removeItem(k); }
     }catch(e){} });
-    profileSichern();
+    saveProfiles();
   }
-  if(!profile.some(x => x.id === profilId)) profilId = profile[0].id;
+  if(!profile.some(x => x.id === profileId)) profileId = profile[0].id;
 }
-profileLaden();
-const profilName = () => (profile.find(x => x.id === profilId) || {}).name || "Profil";
+loadProfiles();
+const profileName = () => (profile.find(x => x.id === profileId) || {}).name || "Profil";
 
-let cfg, plan, eintraege, ferien, sonder, noten;
-function zustandLaden(){
+let config, plan, eintraege, ferien, sonder, noten;
+function loadState(){
   Speicher.puffer = {};
-  cfg       = Object.assign({}, STANDARD, Speicher.lies("cfg", {}));
+  config       = Object.assign({}, STANDARD, Speicher.lies("config", {}));
   plan      = Speicher.lies("plan", {});
   eintraege = Speicher.lies("eintraege", []);
   ferien    = Speicher.lies("ferien", []);
   sonder    = Speicher.lies("sonder", []);
   noten     = Speicher.lies("noten", []);
-  merkblattUmziehen();
-  datenMigrieren();
+  migrateHandouts();
+  migrateData();
 }
-/* Bis Fassung 3 erledigen normalisiere() und merkblattUmziehen() die
+/* Bis Fassung 3 erledigen normalize() und migrateHandouts() die
    Umstellung alter Formen von selbst; hier wird nur festgehalten, worauf
    spätere Schritte aufsetzen. Wichtig ist der umgekehrte Fall: Daten aus
    einer neueren App-Fassung dürfen nicht stillschweigend beschnitten werden. */
-function datenMigrieren(){
-  const war = Number(cfg.fassung) || 0;
+function migrateData(){
+  const war = Number(config.fassung) || 0;
   if(war === SCHEMA) return;
   if(war > SCHEMA){
-    zeigeFehler("Diese Daten stammen aus einer neueren Fassung der App "
+    showError("Diese Daten stammen aus einer neueren Fassung der App "
       + `(Datenstand ${war}, diese App kennt ${SCHEMA}). `
       + "Aktualisiere die App, bevor du weiterarbeitest.");
     return;
   }
-  cfg.fassung = SCHEMA;
-  Speicher.schreib("cfg", cfg);
+  config.fassung = SCHEMA;
+  Speicher.schreib("config", config);
 }
 /* Frühere Fassungen hielten Merkblätter als {FACH: Text}. Jetzt sind es
    normale Einträge vom Typ M — dadurch gelten Suche und Archiv auch dort. */
-function merkblattUmziehen(){
+function migrateHandouts(){
   const alt = Speicher.lies("merkblatt", null);
   if(alt && typeof alt === "object" && !Array.isArray(alt)){
     Object.entries(alt).forEach(([fach, text]) => {
-      if(text) eintraege.push({id:neueId(), typ:"M", fach, datum:iso(new Date()),
+      if(text) eintraege.push({id:newId(), typ:"M", fach, datum:iso(new Date()),
         titel:"Merkblatt", notiz:text, bilder:[], erledigt:false, geloescht:false});
     });
     Speicher.schreib("merkblatt", []);
     Speicher.schreib("eintraege", eintraege);
   }
 }
-zustandLaden();
+loadState();
 
-let ansicht = "tag", einSub = null, bearbeiten = false;
-let gewaehlt = new Date(), kalMonat = new Date(), kalTag = new Date();
+let view = "tag", entrySub = null, editing = false;
+let selectedDate = new Date(), calendarMonth = new Date(), calendarDay = new Date();
 
 /* --- Datum. Bewusst ohne toISOString(), das verschiebt die Zeitzone. --- */
-const zwei = n => String(n).padStart(2,"0");
-const iso  = d => `${d.getFullYear()}-${zwei(d.getMonth()+1)}-${zwei(d.getDate())}`;
-const gleich = (a,b) => iso(a) === iso(b);
-const zeigDatum = s => s ? s.slice(8,10)+"."+s.slice(5,7)+"."+s.slice(0,4) : "";
-function montagVon(d){
+const pad2 = n => String(n).padStart(2,"0");
+const iso  = d => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+const sameDate = (a,b) => iso(a) === iso(b);
+const formatDate = s => s ? s.slice(8,10)+"."+s.slice(5,7)+"."+s.slice(0,4) : "";
+function mondayOf(d){
   const x = new Date(d); x.setHours(0,0,0,0);
   const wt = x.getDay() === 0 ? 7 : x.getDay();
   x.setDate(x.getDate() - (wt - 1)); return x;
 }
-const plusTage = (d,n) => { const x = new Date(d); x.setDate(x.getDate()+n); return x; };
-const tagIndex = d => { const wt = d.getDay(); return (wt >= 1 && wt <= 5) ? wt-1 : 5; };
-function kalenderwoche(d){
+const addDays = (d,n) => { const x = new Date(d); x.setDate(x.getDate()+n); return x; };
+const dayIndex = d => { const wt = d.getDay(); return (wt >= 1 && wt <= 5) ? wt-1 : 5; };
+function calendarWeek(d){
   const x = new Date(d); x.setHours(0,0,0,0);
   x.setDate(x.getDate() + 3 - ((x.getDay()+6)%7));
   const jan4 = new Date(x.getFullYear(),0,4);
   return 1 + Math.round(((x - jan4)/864e5 - 3 + ((jan4.getDay()+6)%7))/7);
 }
-const wocheFuer = d => !cfg.zweiWochen ? "A" : (kalenderwoche(d) % 2 === 1 ? "A" : "B");
-const minuten = s => { const [h,m] = s.split(":").map(Number); return h*60+m; };
-const jetztMin = () => { const n = new Date(); return n.getHours()*60 + n.getMinutes(); };
+const weekFor = d => !config.zweiWochen ? "A" : (calendarWeek(d) % 2 === 1 ? "A" : "B");
+const minutes = s => { const [h,m] = s.split(":").map(Number); return h*60+m; };
+const currentMinutes = () => { const n = new Date(); return n.getHours()*60 + n.getMinutes(); };
 
 /* --- Daten pflegen --- */
-function normalisiere(){
+function normalize(){
   ["A","B"].forEach(w => {
     if(!plan[w]) plan[w] = {};
     TAGE.forEach(t => {
       if(!Array.isArray(plan[w][t])) plan[w][t] = [];
-      plan[w][t].length = cfg.slots.length;
-      for(let i = 0; i < cfg.slots.length; i++){
+      plan[w][t].length = config.slots.length;
+      for(let i = 0; i < config.slots.length; i++){
         const z = plan[w][t][i];
         if(z === undefined || z === null){ plan[w][t][i] = null; continue; }
         /* Fächer überall groß: Einträge werden beim Speichern normalisiert,
-           der Plan tat es früher nicht — sonst gelten „Ch" und „CH" als zwei
+           der Plan tat es früher nicht — sonst gelten „Ch" und „CH" als pad2
            Fächer, das Zeugnis zeigt beide und der Schnitt zerfällt. */
         if(typeof z.fach === "string" && z.fach !== z.fach.trim().toUpperCase())
           z.fach = z.fach.trim().toUpperCase();
@@ -298,39 +298,39 @@ function normalisiere(){
   sonder.forEach(o => {
     if(o.geloescht === undefined) o.geloescht = false;
     if(!EREIGNISARTEN.includes(o.art)) o.art = "ereignis";
-    if(o.slot !== null && o.slot >= cfg.slots.length) o.slot = null;
+    if(o.slot !== null && o.slot >= config.slots.length) o.slot = null;
   });
-  aufraeumen();
+  cleanup();
 }
 /* Abgehakte Hausaufgaben und Klausuren wandern nach sieben Tagen ins Archiv.
    Notizen, Merkblätter und Fehlzeiten bleiben — die will man behalten. */
-function aufraeumen(){
-  const grenze = iso(plusTage(new Date(), -7));
+function cleanup(){
+  const grenze = iso(addDays(new Date(), -7));
   let bewegt = false;
   eintraege.forEach(e => {
     if(!e.geloescht && e.erledigt && (e.typ === "H" || e.typ === "K")
-       && e.erledigtAm && e.erledigtAm <= grenze){ insArchiv(e); bewegt = true; }
+       && e.erledigtAm && e.erledigtAm <= grenze){ moveToArchive(e); bewegt = true; }
   });
   if(bewegt) Speicher.schreib("eintraege", eintraege);
-  archivAufraeumen();
+  cleanupArchive();
 }
 
 /* Wann etwas im Archiv gelandet ist. Ältere Fassungen haben das nicht
    festgehalten — für die beginnt die Frist heute, nicht rückwirkend.
    Sonst verschwände beim ersten Öffnen ohne Vorwarnung ein ganzes Archiv. */
-const archiviertAm = x => x.geloeschtAm || iso(new Date());
-const archivFrist = () => Math.max(0, Number(cfg.archivTage) || 0);
+const archivedAt = x => x.geloeschtAm || iso(new Date());
+const archiveRetention = () => Math.max(0, Number(config.archivTage) || 0);
 /** Tage bis zur endgültigen Entfernung, oder null bei „für immer". */
-function archivRest(x){
-  const tage = archivFrist();
+function archiveRemaining(x){
+  const tage = archiveRetention();
   if(!tage) return null;
-  const alter = Math.round((new Date() - new Date(archiviertAm(x)+"T12:00"))/864e5);
+  const alter = Math.round((new Date() - new Date(archivedAt(x)+"T12:00"))/864e5);
   return tage - alter;
 }
 /* Entfernt endgültig, was die Frist überschritten hat. Bei 0 passiert nichts. */
-function archivAufraeumen(){
-  if(!archivFrist()) return;
-  const behalten = x => !x.geloescht || archivRest(x) > 0;
+function cleanupArchive(){
+  if(!archiveRetention()) return;
+  const behalten = x => !x.geloescht || archiveRemaining(x) > 0;
   const vorher = eintraege.length + sonder.length + noten.length;
   eintraege = eintraege.filter(behalten);
   sonder    = sonder.filter(behalten);
@@ -341,71 +341,71 @@ function archivAufraeumen(){
     Speicher.schreib("noten", noten);
   }
 }
-function sichern(){
-  Speicher.schreib("cfg", cfg); Speicher.schreib("plan", plan);
+function saveAll(){
+  Speicher.schreib("config", config); Speicher.schreib("plan", plan);
   Speicher.schreib("eintraege", eintraege); Speicher.schreib("ferien", ferien);
   Speicher.schreib("sonder", sonder); Speicher.schreib("noten", noten);
 }
 /* Archivieren und Zurückholen an einer Stelle: ohne geloeschtAm wüsste
    niemand, wann die Aufbewahrungsfrist abläuft. */
-function insArchiv(x){ x.geloescht = true; x.geloeschtAm = iso(new Date()); }
-function ausArchiv(x){ x.geloescht = false; x.geloeschtAm = null; }
+function moveToArchive(x){ x.geloescht = true; x.geloeschtAm = iso(new Date()); }
+function restoreFromArchive(x){ x.geloescht = false; x.geloeschtAm = null; }
 
-const aktiv        = () => eintraege.filter(e => !e.geloescht);
-const sonderAktiv  = () => sonder.filter(o => !o.geloescht);
-const notenAktiv   = () => noten.filter(n => !n.geloescht);
-const sonderAn     = (d,slot) => sonderAktiv().find(x => x.datum === iso(d) && x.slot === slot) || null;
-const sonderFrei   = d => sonderAktiv().filter(x => x.datum === iso(d) && x.slot === null);
-const sonderTag    = d => sonderAktiv().filter(x => x.datum === iso(d));
+const activeEntries        = () => eintraege.filter(e => !e.geloescht);
+const activeEvents  = () => sonder.filter(o => !o.geloescht);
+const activeGrades   = () => noten.filter(n => !n.geloescht);
+const eventAt     = (d,slot) => activeEvents().find(x => x.datum === iso(d) && x.slot === slot) || null;
+const freeEvents   = d => activeEvents().filter(x => x.datum === iso(d) && x.slot === null);
+const eventsForDay    = d => activeEvents().filter(x => x.datum === iso(d));
 /* Termine des Tages: Merkblätter haben zwar ein Datum, gehören aber nicht in den Tagesplan. */
-const eintraegeAm  = d => aktiv().filter(e => e.datum === iso(d) && e.typ !== "M")
+const entriesForDay  = d => activeEntries().filter(e => e.datum === iso(d) && e.typ !== "M")
   .sort((a,b) => (a.erledigt - b.erledigt) || "KHFN".indexOf(a.typ) - "KHFN".indexOf(b.typ));
 
-function faecher(){
+function subjects(){
   const s = new Set();
-  /* plan[w] kann fehlen, wenn gelesen wird, bevor normalisiere() lief. */
+  /* plan[w] kann fehlen, wenn gelesen wird, bevor normalize() lief. */
   ["A","B"].forEach(w => TAGE.forEach(t =>
     ((plan[w] && plan[w][t]) || []).forEach(x => x && x.fach && s.add(x.fach))));
   return [...s].sort();
 }
-const alleFaecher = () => [...new Set([...faecher(), ...notenAktiv().map(n => n.fach),
-  ...aktiv().map(e => e.fach)])].filter(Boolean).sort();
-const lehrerName = k => (cfg.lehrer && cfg.lehrer[k]) || k || "";
-const fachName   = k => (cfg.fachnamen && cfg.fachnamen[k]) || k || "";
-const freiAm = d => { const s = iso(d); return ferien.find(f => s >= f.von && s <= f.bis) || null; };
-function hatFachAm(d, fach){
+const allSubjects = () => [...new Set([...subjects(), ...activeGrades().map(n => n.fach),
+  ...activeEntries().map(e => e.fach)])].filter(Boolean).sort();
+const teacherName = k => (config.lehrer && config.lehrer[k]) || k || "";
+const subjectName   = k => (config.fachnamen && config.fachnamen[k]) || k || "";
+const holidayOn = d => { const s = iso(d); return ferien.find(f => s >= f.von && s <= f.bis) || null; };
+function hasSubjectOn(d, fach){
   if(!fach) return false;
-  const i = tagIndex(d); if(i === 5) return false;
-  const woche = plan[wocheFuer(d)];
+  const i = dayIndex(d); if(i === 5) return false;
+  const woche = plan[weekFor(d)];
   return ((woche && woche[TAGE[i]]) || []).some(x => x && x.fach && x.fach.toUpperCase() === fach);
 }
-function naechsterTagMitFach(d, fach){
+function nextDayWithSubject(d, fach){
   for(let i = 1; i <= 120; i++){
-    const x = plusTage(d, i);
-    if(hatFachAm(x, fach) && !freiAm(x)) return x;
+    const x = addDays(d, i);
+    if(hasSubjectOn(x, fach) && !holidayOn(x)) return x;
   }
   return null;
 }
 
 /* --- Noten --- */
-const anteilFuer = fach => {
-  const e = cfg.anteile && cfg.anteile[fach];
-  return Math.max(0, Math.min(100, Number((e === undefined || e === null) ? cfg.anteilM : e) || 0));
+const weightFor = fach => {
+  const e = config.anteile && config.anteile[fach];
+  return Math.max(0, Math.min(100, Number((e === undefined || e === null) ? config.anteilM : e) || 0));
 };
-const hatEigenenAnteil = f => cfg.anteile && cfg.anteile[f] !== undefined && cfg.anteile[f] !== null;
+const hatEigenenAnteil = f => config.anteile && config.anteile[f] !== undefined && config.anteile[f] !== null;
 function notenSchnitt(fach){
   const teil = art => {
-    const l = notenAktiv().filter(n => n.fach === fach && n.art === art);
+    const l = activeGrades().filter(n => n.fach === fach && n.art === art);
     return l.length ? l.reduce((s,n) => s + n.wert, 0) / l.length : null;
   };
-  const m = teil("m"), sch = teil("s"), aM = anteilFuer(fach);
+  const m = teil("m"), sch = teil("s"), aM = weightFor(fach);
   if(m === null && sch === null) return {m:null, s:null, gesamt:null};
   if(m === null)   return {m:null, s:sch, gesamt:sch};
   if(sch === null) return {m, s:null, gesamt:m};
   return {m, s:sch, gesamt:(m*aM + sch*(100-aM))/100};
 }
 const notenText = w => (w === null || w === undefined) ? "—"
-  : (cfg.notenSystem === "punkte15" ? w.toFixed(1) : w.toFixed(2).replace(".", ","));
+  : (config.notenSystem === "punkte15" ? w.toFixed(1) : w.toFixed(2).replace(".", ","));
 const zeugnisNote = w => (w === null || w === undefined) ? null : Math.round(w);
 
 /* --- Werkzeug --- */
@@ -422,64 +422,64 @@ const mitZeitgrenze = (v,ms) => Promise.race([v, new Promise(r => setTimeout(() 
 
 /* --- Darstellung anwenden --- */
 function themaAnwenden(){
-  document.documentElement.style.setProperty("--akzent", cfg.akzent || "#e5382b");
-  document.body.classList.toggle("hell", cfg.modus === "hell");
+  document.documentElement.style.setProperty("--akzent", config.akzent || "#e5382b");
+  document.body.classList.toggle("hell", config.modus === "hell");
   document.body.classList.remove("schrift-mono","schrift-serif");
-  if(cfg.schrift === "mono") document.body.classList.add("schrift-mono");
-  if(cfg.schrift === "serif") document.body.classList.add("schrift-serif");
+  if(config.schrift === "mono") document.body.classList.add("schrift-mono");
+  if(config.schrift === "serif") document.body.classList.add("schrift-serif");
   const m = document.querySelector('meta[name=theme-color]');
-  if(m) m.setAttribute("content", cfg.modus === "hell" ? "#f7f7f5" : "#0a0a0a");
+  if(m) m.setAttribute("content", config.modus === "hell" ? "#f7f7f5" : "#0a0a0a");
 }
 
 /* =====================================================================
    Zeichnen
    ===================================================================== */
 function zeichne(){
-  normalisiere();
+  normalize();
   themaAnwenden();
-  $("#ansichtTag").classList.toggle("hidden", ansicht !== "tag");
-  $("#ansichtKal").classList.toggle("hidden", ansicht !== "kalender");
-  $("#ansichtEin").classList.toggle("hidden", ansicht !== "eintraege");
-  $("#ansichtZeu").classList.toggle("hidden", ansicht !== "zeugnis");
-  $("#rTag").setAttribute("aria-pressed", ansicht === "tag");
-  $("#rKal").setAttribute("aria-pressed", ansicht === "kalender");
-  $("#rEin").setAttribute("aria-pressed", ansicht === "eintraege");
-  $("#rZeu").setAttribute("aria-pressed", ansicht === "zeugnis");
-  $("#btnEdit").classList.toggle("hidden", ansicht !== "tag");
+  $("#ansichtTag").classList.toggle("hidden", view !== "tag");
+  $("#ansichtKal").classList.toggle("hidden", view !== "kalender");
+  $("#ansichtEin").classList.toggle("hidden", view !== "eintraege");
+  $("#ansichtZeu").classList.toggle("hidden", view !== "zeugnis");
+  $("#rTag").setAttribute("aria-pressed", view === "tag");
+  $("#rKal").setAttribute("aria-pressed", view === "kalender");
+  $("#rEin").setAttribute("aria-pressed", view === "eintraege");
+  $("#rZeu").setAttribute("aria-pressed", view === "zeugnis");
+  $("#btnEdit").classList.toggle("hidden", view !== "tag");
   const punkte = $("#wischPunkte");
-  if(punkte) [...punkte.children].forEach((p,i) => p.classList.toggle("an", ANSICHTEN[i] === ansicht));
+  if(punkte) [...punkte.children].forEach((p,i) => p.classList.toggle("an", ANSICHTEN[i] === view));
   try{
-    if(ansicht === "tag") zeichneTag();
-    else if(ansicht === "kalender") zeichneKalender();
-    else if(ansicht === "zeugnis") zeichneZeugnis();
+    if(view === "tag") zeichneTag();
+    else if(view === "kalender") zeichneKalender();
+    else if(view === "zeugnis") zeichneZeugnis();
     else zeichneEintraege();
-  }catch(e){ zeigeFehler("Ansicht \u201e"+ansicht+"\u201c: "+e.message, (e.stack||"").split("\n")[1]||""); }
+  }catch(e){ showError("Ansicht \u201e"+view+"\u201c: "+e.message, (e.stack||"").split("\n")[1]||""); }
 }
 
 function zeichneTag(){
-  const idx = tagIndex(gewaehlt), woche = wocheFuer(gewaehlt);
-  document.body.classList.toggle("bearbeiten", bearbeiten);
-  $("#btnEdit").setAttribute("aria-pressed", bearbeiten);
-  $("#editHinweis").classList.toggle("hidden", !bearbeiten);
-  $("#klasseAnzeige").textContent = cfg.klasse || "Stundenplan";
+  const idx = dayIndex(selectedDate), woche = weekFor(selectedDate);
+  document.body.classList.toggle("editing", editing);
+  $("#btnEdit").setAttribute("aria-pressed", editing);
+  $("#editHinweis").classList.toggle("hidden", !editing);
+  $("#klasseAnzeige").textContent = config.klasse || "Stundenplan";
   $("#titel").innerHTML = (idx === 5 ? "Wochenende" : LANG[TAGE[idx]]) +
-    ` <span>${zwei(gewaehlt.getDate())}.${zwei(gewaehlt.getMonth()+1)}.</span>`;
-  $("#kwLabel").textContent = "KW " + kalenderwoche(gewaehlt);
-  $("#abLabel").classList.toggle("hidden", !cfg.zweiWochen);
+    ` <span>${pad2(selectedDate.getDate())}.${pad2(selectedDate.getMonth()+1)}.</span>`;
+  $("#kwLabel").textContent = "KW " + calendarWeek(selectedDate);
+  $("#abLabel").classList.toggle("hidden", !config.zweiWochen);
   $("#abLabel").textContent = woche;
   $("#countdown").textContent = countdownText();
 
-  const frei = freiAm(gewaehlt), b = $("#freiBanner");
+  const frei = holidayOn(selectedDate), b = $("#freiBanner");
   b.classList.toggle("hidden", !frei);
   if(frei) b.innerHTML = `<b>${esc(frei.name)}</b><div>${frei.typ === "feiertag" ? "Feiertag" : "Ferien"} · kein Unterricht</div>`;
 
-  const mo = montagVon(gewaehlt);
+  const mo = mondayOf(selectedDate);
   $("#tage").innerHTML = [...TAGE, "WE"].map((t,i) => {
-    const d = plusTage(mo, i === 5 ? 5 : i);
-    const istHeute = gleich(d, new Date()) ||
-      (i === 5 && tagIndex(new Date()) === 5 && gleich(montagVon(new Date()), mo));
-    const hat = (i === 5 ? [plusTage(mo,5), plusTage(mo,6)] : [d])
-      .flatMap(x => eintraegeAm(x)).filter(e => !e.erledigt);
+    const d = addDays(mo, i === 5 ? 5 : i);
+    const istHeute = sameDate(d, new Date()) ||
+      (i === 5 && dayIndex(new Date()) === 5 && sameDate(mondayOf(new Date()), mo));
+    const hat = (i === 5 ? [addDays(mo,5), addDays(mo,6)] : [d])
+      .flatMap(x => entriesForDay(x)).filter(e => !e.erledigt);
     const zeichen = [...new Set(hat.map(e => e.typ))].join("");
     return `<button type="button" data-tag="${i}" aria-pressed="${i === idx}">${t}
       ${istHeute ? '<span class="punkt"></span>'
@@ -488,19 +488,19 @@ function zeichneTag(){
   }).join("");
 
   if(idx === 5){
-    $("#plan").innerHTML = [["Samstag",plusTage(mo,5)],["Sonntag",plusTage(mo,6)]].map(([n,d]) => {
-      /* sonderTag statt sonderFrei: ein Ereignis, dem jemand eine Stunde
+    $("#plan").innerHTML = [["Samstag",addDays(mo,5)],["Sonntag",addDays(mo,6)]].map(([n,d]) => {
+      /* eventsForDay statt freeEvents: ein Ereignis, dem jemand eine Stunde
          zugeordnet hat, war am Wochenende sonst unsichtbar. */
-      const es = eintraegeAm(d), ev = sonderTag(d);
+      const es = entriesForDay(d), ev = eventsForDay(d);
       const inhalt =
         ev.map(o => `<div style="margin-top:9px" data-wesonder="${o.id}">
              <span class="einmalig">${o.art === "vertretung" ? "Vertretung" : o.art === "ausfall" ? "Ausfall" : "Ereignis"}</span>
              <span style="margin-left:7px">${esc(o.titel)}${
-               o.slot !== null && cfg.slots[o.slot] ? " · " + esc(cfg.slots[o.slot].von) : ""}</span></div>`).join("") +
+               o.slot !== null && config.slots[o.slot] ? " · " + esc(config.slots[o.slot].von) : ""}</span></div>`).join("") +
         es.map(e => `<div style="margin-top:9px"><span class="khn">${e.typ}</span>
              <span style="margin-left:7px">${e.fach ? esc(e.fach)+" — " : ""}${esc(e.titel) || ART[e.typ]}</span></div>`).join("");
       return `<div class="we-teil">
-        <div class="eyebrow">${n} ${zwei(d.getDate())}.${zwei(d.getMonth()+1)}.</div>
+        <div class="eyebrow">${n} ${pad2(d.getDate())}.${pad2(d.getMonth()+1)}.</div>
         ${inhalt || `<div class="detail" style="margin-top:6px">frei</div>`}
         <button class="mini" data-weplus="${iso(d)}" style="margin-top:11px">+ Ereignis</button>
       </div>`;
@@ -510,16 +510,16 @@ function zeichneTag(){
     /* Leere Stunden am Ende des Tages werden abgeschnitten — der Tag endet
        dort, wo der Unterricht endet. Freistunden mittendrin bleiben stehen. */
     let letzte = -1;
-    cfg.slots.forEach((s,i) => { if(plan[woche][tag][i] || sonderAn(gewaehlt,i)) letzte = i; });
-    const bis = letzte < 0 ? cfg.slots.length : letzte + 1;
+    config.slots.forEach((s,i) => { if(plan[woche][tag][i] || eventAt(selectedDate,i)) letzte = i; });
+    const bis = letzte < 0 ? config.slots.length : letzte + 1;
     const linie = jetztLinie(bis);
 
-    const teile = cfg.slots.slice(0, bis).map((s,i) => {
+    const teile = config.slots.slice(0, bis).map((s,i) => {
       const regulaer = plan[woche][tag][i];
-      const o = sonderAn(gewaehlt, i);
+      const o = eventAt(selectedDate, i);
       const ausfall = o && o.art === "ausfall";
       const f = (o && !ausfall) ? null : regulaer;
-      const es = eintraegeAm(gewaehlt).filter(e => !e.erledigt && f && e.fach &&
+      const es = entriesForDay(selectedDate).filter(e => !e.erledigt && f && e.fach &&
                    e.fach.toUpperCase() === f.fach.toUpperCase());
       const zeichen = [...new Set(es.map(e => e.typ))].map(t => `<span class="khn">${t}</span>`).join("");
       const text = ausfall ? esc(regulaer ? regulaer.fach : "—")
@@ -541,13 +541,13 @@ function zeichneTag(){
         </div></button>`;
     });
     if(linie !== null) teile.splice(linie, 0, '<div class="jetztlinie"><span>jetzt</span></div>');
-    if(bis < cfg.slots.length && bis > 0)
-      teile.push(`<div class="schluss">Schluss nach ${esc(cfg.slots[bis-1].bis)}</div>`);
+    if(bis < config.slots.length && bis > 0)
+      teile.push(`<div class="schluss">Schluss nach ${esc(config.slots[bis-1].bis)}</div>`);
     $("#plan").innerHTML = teile.join("");
   }
   zeichneFortschritt();
   sicherungBanner();
-  zeichneListe("#tagListe", "#tagNix", eintraegeAm(gewaehlt));
+  zeichneListe("#tagListe", "#tagNix", entriesForDay(selectedDate));
 }
 
 /* Das README verspricht eine Erinnerung nach vier Wochen. Sie stand bisher
@@ -559,16 +559,16 @@ function zeichneTag(){
 function sicherungDatum(){
   let geraet = "";
   try{ geraet = localStorage.getItem("sicherungZuletzt") || ""; }catch(e){}
-  const imProfil = cfg.letzteSicherung || "";
+  const imProfil = config.letzteSicherung || "";
   return geraet > imProfil ? geraet : imProfil;
 }
 const sicherungAlter = () => {
   const l = sicherungDatum();
   return l ? Math.round((new Date() - new Date(l+"T12:00"))/864e5) : null;
 };
-const hatEchteDaten = () => !!(eintraege.length || noten.length || faecher().length);
+const hatEchteDaten = () => !!(eintraege.length || noten.length || subjects().length);
 function sicherungFaellig(){
-  const tage = Math.max(0, Number(cfg.sicherTage) || 0);
+  const tage = Math.max(0, Number(config.sicherTage) || 0);
   if(!tage || !hatEchteDaten()) return false;
   const alter = sicherungAlter();
   return alter === null || alter >= tage;
@@ -584,7 +584,7 @@ function sicherungBanner(){
       : "Letzte Sicherung vor " + zahl(alter,"Tag","Tagen") + "."}
       Löscht der Browser seine Websitedaten, ist ohne Sicherung alles weg.</div>
     <div class="chips" style="margin-top:11px">
-      <button type="button" id="bSicherJetzt">Jetzt sichern</button>
+      <button type="button" id="bSicherJetzt">Jetzt saveAll</button>
       <button type="button" id="bSicherSpaeter">Heute nicht</button>
     </div>`;
 }
@@ -607,47 +607,47 @@ function kurzHinweis(text){
 $("#toast").onclick = () => $("#toast").classList.add("hidden");
 
 const istHeuteSchultag = () =>
-  gleich(gewaehlt, new Date()) && tagIndex(gewaehlt) !== 5 && cfg.slots.length && !freiAm(gewaehlt);
+  sameDate(selectedDate, new Date()) && dayIndex(selectedDate) !== 5 && config.slots.length && !holidayOn(selectedDate);
 function istAktuellerSlot(i){
   if(!istHeuteSchultag()) return false;
-  const j = jetztMin();
-  return j >= minuten(cfg.slots[i].von) && j < minuten(cfg.slots[i].bis);
+  const j = currentMinutes();
+  return j >= minutes(config.slots[i].von) && j < minutes(config.slots[i].bis);
 }
 function jetztLinie(bis){
   if(!istHeuteSchultag()) return null;
-  const j = jetztMin();
-  if(cfg.slots.some((s,i) => istAktuellerSlot(i))) return null;
-  if(j < minuten(cfg.slots[0].von)) return 0;
+  const j = currentMinutes();
+  if(config.slots.some((s,i) => istAktuellerSlot(i))) return null;
+  if(j < minutes(config.slots[0].von)) return 0;
   for(let i = 0; i < bis-1; i++)
-    if(j >= minuten(cfg.slots[i].bis) && j < minuten(cfg.slots[i+1].von)) return i+1;
+    if(j >= minutes(config.slots[i].bis) && j < minutes(config.slots[i+1].von)) return i+1;
   return bis;
 }
 function zeichneFortschritt(){
   const box = $("#fortschritt");
   if(!istHeuteSchultag()){ box.classList.add("hidden"); return; }
   box.classList.remove("hidden");
-  const j = jetztMin(), tag = TAGE[tagIndex(gewaehlt)], woche = wocheFuer(gewaehlt);
-  const inhalt = i => sonderAn(gewaehlt,i) || plan[woche][tag][i];
-  const ersteVon = minuten(cfg.slots[0].von), letzteBis = minuten(cfg.slots.at(-1).bis);
+  const j = currentMinutes(), tag = TAGE[dayIndex(selectedDate)], woche = weekFor(selectedDate);
+  const inhalt = i => eventAt(selectedDate,i) || plan[woche][tag][i];
+  const ersteVon = minutes(config.slots[0].von), letzteBis = minutes(config.slots.at(-1).bis);
   let anteil = 0, links = "", rechts = "";
-  const i = cfg.slots.findIndex((s,k) => istAktuellerSlot(k));
+  const i = config.slots.findIndex((s,k) => istAktuellerSlot(k));
   if(i >= 0){
-    const s = cfg.slots[i], von = minuten(s.von), bis = minuten(s.bis);
+    const s = config.slots[i], von = minutes(s.von), bis = minutes(s.bis);
     anteil = (j - von)/(bis - von);
     const x = inhalt(i);
     links = x ? `<b>${esc(x.fach || x.titel)}</b>${x.raum ? " · "+esc(x.raum) : ""}` : "Freistunde";
     rechts = `noch ${bis - j} min`;
   } else if(j < ersteVon){
-    links = "Beginnt um " + cfg.slots[0].von; rechts = `in ${ersteVon - j} min`;
+    links = "Beginnt um " + config.slots[0].von; rechts = `in ${ersteVon - j} min`;
   } else if(j >= letzteBis){
     anteil = 1; links = "Schule aus"; rechts = "";
   } else {
-    let vor = cfg.slots[0], nach = cfg.slots.at(-1);
-    for(let k = 0; k < cfg.slots.length-1; k++)
-      if(j >= minuten(cfg.slots[k].bis) && j < minuten(cfg.slots[k+1].von)){ vor = cfg.slots[k]; nach = cfg.slots[k+1]; }
-    const von = minuten(vor.bis), bis = minuten(nach.von);
+    let vor = config.slots[0], nach = config.slots.at(-1);
+    for(let k = 0; k < config.slots.length-1; k++)
+      if(j >= minutes(config.slots[k].bis) && j < minutes(config.slots[k+1].von)){ vor = config.slots[k]; nach = config.slots[k+1]; }
+    const von = minutes(vor.bis), bis = minutes(nach.von);
     anteil = (j - von)/(bis - von);
-    const naechstes = inhalt(cfg.slots.indexOf(nach));
+    const naechstes = inhalt(config.slots.indexOf(nach));
     links = `<b>Pause</b>${naechstes ? " · dann "+esc(naechstes.fach || naechstes.titel) : ""}`;
     rechts = `weiter um ${nach.von} · noch ${bis - j} min`;
   }
@@ -658,10 +658,10 @@ function zeichneFortschritt(){
 function countdownText(){
   const heute = new Date();
   if(istHeuteSchultag()){
-    const j = jetztMin(), ende = minuten(cfg.slots.at(-1).bis);
+    const j = currentMinutes(), ende = minutes(config.slots.at(-1).bis);
     if(j < ende){
       const rest = ende - j;
-      return `Schulschluss in ${Math.floor(rest/60)} h ${zwei(rest%60)} min`;
+      return `Schulschluss in ${Math.floor(rest/60)} h ${pad2(rest%60)} min`;
     }
   }
   const naechste = ferien.filter(f => f.typ === "ferien" && f.von > iso(heute))
@@ -691,26 +691,26 @@ function zeichneListe(sel, nixSel, liste, mitNotiz = true){
 }
 
 function zeichneKalender(){
-  $("#monatLabel").textContent = kalMonat.toLocaleDateString("de-DE",{month:"long",year:"numeric"});
-  const start = montagVon(new Date(kalMonat.getFullYear(), kalMonat.getMonth(), 1));
+  $("#monatLabel").textContent = calendarMonth.toLocaleDateString("de-DE",{month:"long",year:"numeric"});
+  const start = mondayOf(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1));
   let html = ["Mo","Di","Mi","Do","Fr","Sa","So"].map(t => `<div class="wt">${t}</div>`).join("");
   for(let i = 0; i < 42; i++){
-    const d = plusTage(start, i);
-    const es = eintraegeAm(d).filter(e => !e.erledigt);
+    const d = addDays(start, i);
+    const es = entriesForDay(d).filter(e => !e.erledigt);
     const zeichen = [...new Set(es.map(e => e.typ))].map(t => `<i>${t}</i>`).join("")
-      + (sonderTag(d).length ? '<span class="quadratfach"></span>' : "");
-    html += `<button type="button" class="tagfeld ${d.getMonth() !== kalMonat.getMonth() ? "fremd" : ""}
-       ${gleich(d,new Date()) ? "heute" : ""} ${freiAm(d) ? "ferien" : ""}"
-       aria-pressed="${gleich(d,kalTag)}" data-kal="${iso(d)}">
+      + (eventsForDay(d).length ? '<span class="quadratfach"></span>' : "");
+    html += `<button type="button" class="tagfeld ${d.getMonth() !== calendarMonth.getMonth() ? "fremd" : ""}
+       ${sameDate(d,new Date()) ? "heute" : ""} ${holidayOn(d) ? "ferien" : ""}"
+       aria-pressed="${sameDate(d,calendarDay)}" data-kal="${iso(d)}">
        ${d.getDate()}<span class="zeichen">${zeichen}</span></button>`;
   }
   $("#gitter").innerHTML = html;
-  $("#kalTagLabel").textContent = kalTag.toLocaleDateString("de-DE",{weekday:"long",day:"2-digit",month:"long"});
-  const frei = freiAm(kalTag);
+  $("#kalTagLabel").textContent = calendarDay.toLocaleDateString("de-DE",{weekday:"long",day:"2-digit",month:"long"});
+  const frei = holidayOn(calendarDay);
   $("#kalFerien").classList.toggle("hidden", !frei);
   if(frei) $("#kalFerien").textContent = frei.name + (frei.typ === "feiertag" ? " · Feiertag" : " · Ferien");
-  zeichneListe("#kalListe", "#kalNix", eintraegeAm(kalTag), false);
-  const ev = sonderTag(kalTag);
+  zeichneListe("#kalListe", "#kalNix", entriesForDay(calendarDay), false);
+  const ev = eventsForDay(calendarDay);
   if(ev.length){
     $("#kalListe").insertAdjacentHTML("afterbegin", ev.map(o => `<li>
       <span style="width:18px;flex:none"></span>
@@ -723,7 +723,7 @@ function zeichneKalender(){
 /* --- Einträge --- */
 /** Reihenfolge der Kacheln, unbekannte Einträge hinten. */
 function reiheEin(){
-  const w = Array.isArray(cfg.reiheEin) ? cfg.reiheEin.filter(x => REIHE_STANDARD.includes(x)) : [];
+  const w = Array.isArray(config.reiheEin) ? config.reiheEin.filter(x => REIHE_STANDARD.includes(x)) : [];
   return [...w, ...REIHE_STANDARD.filter(x => !w.includes(x))];
 }
 function kachelnZeichnen(){
@@ -732,30 +732,30 @@ function kachelnZeichnen(){
 }
 const listeVonTyp = t => {
   const heuteIso = iso(new Date());
-  if(t === "M") return aktiv().filter(e => e.typ === "M").sort((a,b) => (a.fach||"").localeCompare(b.fach||"") || b.datum.localeCompare(a.datum));
-  if(t === "F") return aktiv().filter(e => e.typ === "F").sort((a,b) => b.datum.localeCompare(a.datum));
-  return aktiv().filter(e => e.typ === t && (!e.erledigt || e.datum >= heuteIso))
+  if(t === "M") return activeEntries().filter(e => e.typ === "M").sort((a,b) => (a.fach||"").localeCompare(b.fach||"") || b.datum.localeCompare(a.datum));
+  if(t === "F") return activeEntries().filter(e => e.typ === "F").sort((a,b) => b.datum.localeCompare(a.datum));
+  return activeEntries().filter(e => e.typ === t && (!e.erledigt || e.datum >= heuteIso))
     .sort((a,b) => (a.erledigt - b.erledigt) || a.datum.localeCompare(b.datum));
 };
-const kommendeEreignisse = () => sonderAktiv()
-  .filter(o => o.datum >= iso(plusTage(new Date(), -7)))
+const kommendeEreignisse = () => activeEvents()
+  .filter(o => o.datum >= iso(addDays(new Date(), -7)))
   .sort((a,b) => a.datum.localeCompare(b.datum) || ((a.slot ?? -1) - (b.slot ?? -1)));
 function archivListe(){
   return [
     ...eintraege.filter(e => e.geloescht).map(e => ({art:"eintrag", id:e.id, marke:e.typ, datum:e.datum,
-      seit:archiviertAm(e), rest:archivRest(e),
+      seit:archivedAt(e), rest:archiveRemaining(e),
       text:(e.fach ? e.fach+" — " : "") + (e.titel || ART[e.typ] || "")})),
     ...sonder.filter(o => o.geloescht).map(o => ({art:"ereignis", id:o.id, marke:"E", datum:o.datum,
-      seit:archiviertAm(o), rest:archivRest(o), text:o.titel})),
+      seit:archivedAt(o), rest:archiveRemaining(o), text:o.titel})),
     ...noten.filter(n => n.geloescht).map(n => ({art:"note", id:n.id, marke:"G", datum:n.datum,
-      seit:archiviertAm(n), rest:archivRest(n),
-      text:`${notenText(n.wert)} · ${fachName(n.fach)}${n.titel ? " — "+n.titel : ""}`}))
+      seit:archivedAt(n), rest:archiveRemaining(n),
+      text:`${notenText(n.wert)} · ${subjectName(n.fach)}${n.titel ? " — "+n.titel : ""}`}))
   ].sort((a,b) => (a.rest === null ? 1e9 : a.rest) - (b.rest === null ? 1e9 : b.rest)
                || b.datum.localeCompare(a.datum));
 }
 /* Was der Hinweis oben im Archiv sagt. */
 function archivHinweis(liste){
-  const tage = archivFrist();
+  const tage = archiveRetention();
   if(!tage) return "Gelöschtes bleibt hier, bis du es selbst entfernst. "
     + "Eine Frist stellst du unter ⚙ → Archiv ein.";
   const bald = liste.filter(a => a.rest !== null && a.rest <= 7).length;
@@ -767,12 +767,12 @@ const archivFinden = (art,id) => art === "eintrag" ? eintraege.find(x => x.id ==
   : art === "ereignis" ? sonder.find(x => x.id === id) : noten.find(x => x.id === id);
 
 function zeichneEintraege(){
-  $("#einMenu").classList.toggle("hidden", einSub !== null);
-  $("#einDetail").classList.toggle("hidden", einSub === null);
+  $("#einMenu").classList.toggle("hidden", entrySub !== null);
+  $("#einDetail").classList.toggle("hidden", entrySub === null);
   $("#einSubHinweis").textContent = "";
   $("#einSubHinweis").style.color = "";
 
-  if(einSub === null){
+  if(entrySub === null){
     kachelnZeichnen();
     const off = t => listeVonTyp(t).filter(e => !e.erledigt).length;
     const std = fehlStunden();
@@ -781,7 +781,7 @@ function zeichneEintraege(){
       K: off("K") ? `${off("K")} anstehend` : "nichts anstehend",
       N: off("N") ? `${off("N")} vorhanden` : "keine",
       E: kommendeEreignisse().length ? `${kommendeEreignisse().length} geplant` : "keine",
-      G: notenAktiv().length ? `${notenAktiv().length} eingetragen` : "keine",
+      G: activeGrades().length ? `${activeGrades().length} eingetragen` : "keine",
       M: listeVonTyp("M").length ? `${listeVonTyp("M").length} vorhanden` : "keine",
       F: std ? `${zahl(std,"Stunde","Stunden")} · ${tageText(std)}` : "keine",
       archiv: archivListe().length ? `${archivListe().length} im Archiv` : "leer"
@@ -791,13 +791,13 @@ function zeichneEintraege(){
 
     return;
   }
-  $("#einTitel").textContent = ARTLANG[einSub] || "";
+  $("#einTitel").textContent = ARTLANG[entrySub] || "";
 
-  if(einSub === "archiv"){
+  if(entrySub === "archiv"){
     const liste = archivListe();
     const el = $("#einSubHinweis");
     el.textContent = archivHinweis(liste);
-    el.style.color = archivFrist() ? "var(--akzent)" : "";
+    el.style.color = archiveRetention() ? "var(--akzent)" : "";
     $("#einListe").innerHTML = liste.map(e => {
       const rest = e.rest === null ? ""
         : e.rest <= 0 ? " · wird beim nächsten Öffnen entfernt"
@@ -806,7 +806,7 @@ function zeichneEintraege(){
       <div class="wachs">
         <div class="kopf"><span class="khn aus">${esc(e.marke)}</span>
           <span class="titel" style="color:var(--muted)">${esc(e.text)}</span></div>
-        <div class="wann">${zeigDatum(e.datum)} · gelöscht ${zeigDatum(e.seit)}<span
+        <div class="wann">${formatDate(e.datum)} · gelöscht ${formatDate(e.seit)}<span
           style="${e.rest !== null && e.rest <= 7 ? "color:var(--akzent)" : ""}">${rest}</span></div></div>
       <button class="mini" data-zurueck="${e.art}:${e.id}">Zurück</button>
       <button class="mini" data-endgueltig="${e.art}:${e.id}" style="border-color:var(--akzent);color:var(--akzent)">Löschen</button>
@@ -815,12 +815,12 @@ function zeichneEintraege(){
     $("#einNix").hidden = liste.length > 0;
     return;
   }
-  if(einSub === "E"){
+  if(entrySub === "E"){
     const liste = kommendeEreignisse();
     $("#einListe").innerHTML = liste.map(o => {
       const d = new Date(o.datum+"T12:00");
       const wann = d.toLocaleDateString("de-DE",{weekday:"short",day:"2-digit",month:"2-digit"}) +
-        (o.slot !== null && cfg.slots[o.slot] ? ` · ${cfg.slots[o.slot].von}` : " · ganzer Tag");
+        (o.slot !== null && config.slots[o.slot] ? ` · ${config.slots[o.slot].von}` : " · ganzer Tag");
       return `<li><span style="width:18px;flex:none"></span>
         <div class="wachs" data-ereignis="${o.id}">
           <div class="kopf"><span class="einmalig">${o.art === "ausfall" ? "Ausfall" : o.art === "vertretung" ? "Vertretung" : "Ereignis"}</span>
@@ -832,26 +832,26 @@ function zeichneEintraege(){
     $("#einNix").hidden = liste.length > 0;
     return;
   }
-  if(einSub === "G"){ zeichneNoten(); return; }
-  if(einSub === "M"){ zeichneMerk(); return; }
-  if(einSub === "F"){ zeichneFehlzeiten(); return; }
+  if(entrySub === "G"){ zeichneNoten(); return; }
+  if(entrySub === "M"){ zeichneMerk(); return; }
+  if(entrySub === "F"){ zeichneFehlzeiten(); return; }
 
-  const liste = listeVonTyp(einSub);
+  const liste = listeVonTyp(entrySub);
   zeichneListe("#einListe", "#einNix", liste);
   $("#einNix").textContent = {H:"Keine offenen Hausaufgaben.",K:"Keine Klausuren eingetragen.",
-                              N:"Keine Notizen."}[einSub] || "Nichts vorhanden.";
+                              N:"Keine Notizen."}[entrySub] || "Nichts vorhanden.";
 }
 
 function zeichneNoten(){
   $("#einSubHinweis").textContent =
-    `Verhältnis je Fach antippbar. Standard: ${Number(cfg.anteilM)||0} % mündlich.`;
-  const liste = alleFaecher().filter(f => notenAktiv().some(n => n.fach === f));
+    `Verhältnis je Fach antippbar. Standard: ${Number(config.anteilM)||0} % mündlich.`;
+  const liste = allSubjects().filter(f => activeGrades().some(n => n.fach === f));
   $("#einListe").innerHTML = liste.map(f => {
-    const sch = notenSchnitt(f), aM = anteilFuer(f);
-    const eigene = notenAktiv().filter(n => n.fach === f).sort((a,b) => b.datum.localeCompare(a.datum));
+    const sch = notenSchnitt(f), aM = weightFor(f);
+    const eigene = activeGrades().filter(n => n.fach === f).sort((a,b) => b.datum.localeCompare(a.datum));
     return `<li style="display:block;padding:0;border:0"><div class="notenkarte">
       <div class="kopfz">
-        <div><div style="font-size:17px">${esc(fachName(f))}</div>
+        <div><div style="font-size:17px">${esc(subjectName(f))}</div>
           <div class="teil">mündlich ${notenText(sch.m)} · schriftlich ${notenText(sch.s)}</div></div>
         <div class="schnitt">${notenText(sch.gesamt)}</div></div>
       <div class="notenchips"><button type="button" class="anteilchip" data-anteil="${esc(f)}">
@@ -860,7 +860,7 @@ function zeichneNoten(){
         <span class="wert">${notenText(n.wert)}</span>
         <span class="art">${n.art === "m" ? "mündl." : "schriftl."}</span>
         <span class="wofuer">${esc(n.titel) || "—"}</span>
-        <span class="tag">${zeigDatum(n.datum)}</span></div>`).join("")}
+        <span class="tag">${formatDate(n.datum)}</span></div>`).join("")}
     </div></li>`;
   }).join("");
   $("#einNix").textContent = "Noch keine Noten eingetragen.";
@@ -872,13 +872,13 @@ function zeichneMerk(){
   $("#einSubHinweis").textContent = "Antippen zum Ansehen.";
   let letztesFach = null;
   $("#einListe").innerHTML = liste.map(e => {
-    const kopf = e.fach !== letztesFach ? `<div class="eyebrow mitte" style="margin-top:18px">${esc(fachName(e.fach))}</div>` : "";
+    const kopf = e.fach !== letztesFach ? `<div class="eyebrow mitte" style="margin-top:18px">${esc(subjectName(e.fach))}</div>` : "";
     letztesFach = e.fach;
     const bilder = (e.bilder || []).length;
     return `<li style="display:block;padding:0;border:0">${kopf}
       <button type="button" class="merkzeile" data-schau="${e.id}">
         <div class="mtitel">${esc(e.titel) || "Merkblatt"}</div>
-        <div class="mstand">${zeigDatum(e.datum)}${e.zeit ? " · "+e.zeit : ""}
+        <div class="mstand">${formatDate(e.datum)}${e.zeit ? " · "+e.zeit : ""}
           ${bilder ? " · " + zahl(bilder,"Bild","Bilder") : ""}</div>
       </button></li>`;
   }).join("");
@@ -892,7 +892,7 @@ const fehlStunden = art => listeVonTyp("F")
   .filter(e => !art || e.titel === art)
   .reduce((s,e) => s + (Number(e.stunden) || 1), 0);
 const alsTage = std => {
-  const p = Math.max(1, Number(cfg.stdProTag) || 8);
+  const p = Math.max(1, Number(config.stdProTag) || 8);
   const t = std / p;
   return t % 1 ? t.toFixed(1).replace(".", ",") : String(t);
 };
@@ -912,15 +912,15 @@ function zeichneFehlzeiten(){
       <div class="kopf"><span class="khn">F</span>
         <span class="titel">${zahl(Number(e.stunden)||1,"Stunde","Stunden")} — ${esc(e.titel) || "Fehlzeit"}</span></div>
       ${e.notiz ? `<div class="notiz">${esc(e.notiz)}</div>` : ""}
-      <div class="wann">${zeigDatum(e.datum)}</div></div></li>`).join("");
+      <div class="wann">${formatDate(e.datum)}</div></div></li>`).join("");
   $("#einNix").textContent = "Keine Fehlzeiten erfasst.";
   $("#einNix").hidden = liste.length > 0;
 }
 
 /** Fächer in der eingestellten Reihenfolge, neue hinten angehängt. */
 function fachReihenfolge(){
-  const alle = alleFaecher().filter(f => faecher().includes(f) || notenAktiv().some(n => n.fach === f));
-  const wunsch = Array.isArray(cfg.reiheFach) ? cfg.reiheFach : [];
+  const alle = allSubjects().filter(f => subjects().includes(f) || activeGrades().some(n => n.fach === f));
+  const wunsch = Array.isArray(config.reiheFach) ? config.reiheFach : [];
   return [...wunsch.filter(f => alle.includes(f)), ...alle.filter(f => !wunsch.includes(f))];
 }
 function zeichneZeugnis(){
@@ -929,16 +929,16 @@ function zeichneZeugnis(){
   const gesamt = schnitte.length ? schnitte.reduce((a,b) => a+b, 0)/schnitte.length : null;
   $("#zeuSchnitt").textContent = gesamt === null ? "" : notenText(gesamt);
   const fehl = fehlText();
-  $("#zeuHinweis").textContent = (notenAktiv().length
-    ? `Aus ${zahl(notenAktiv().length,"Note","Noten")} in ${schnitte.length} von ${liste.length} Fächern.`
+  $("#zeuHinweis").textContent = (activeGrades().length
+    ? `Aus ${zahl(activeGrades().length,"Note","Noten")} in ${schnitte.length} von ${liste.length} Fächern.`
     : "Noch keine Noten. Tippe ein Fach an, um Verhältnis und Zielnote zu setzen.")
     + (fehl ? `  Versäumt: ${fehl}.` : "");
   $("#zeuListe").innerHTML = liste.map(f => {
     const sch = notenSchnitt(f), ganz = zeugnisNote(sch.gesamt);
-    const anzahl = notenAktiv().filter(n => n.fach === f).length;
+    const anzahl = activeGrades().filter(n => n.fach === f).length;
     return `<button type="button" class="zeuZeile" data-zeufach="${esc(f)}">
-      <div class="fachn">${esc(fachName(f))}
-        <small>${anzahl ? zahl(anzahl,"Note","Noten") : "keine Noten"} · ${anteilFuer(f)} % mündlich</small></div>
+      <div class="fachn">${esc(subjectName(f))}
+        <small>${anzahl ? zahl(anzahl,"Note","Noten") : "keine Noten"} · ${weightFor(f)} % mündlich</small></div>
       <div class="roh">${notenText(sch.gesamt)}</div>
       <div class="note">${ganz === null ? "—" : ganz}</div></button>`;
   }).join("");
@@ -950,28 +950,28 @@ function zeichneZeugnis(){
    ===================================================================== */
 const ANSICHTEN = ["tag","kalender","eintraege","zeugnis"];
 function zeigeAnsicht(a){
-  ansicht = a;
-  if(a === "kalender"){ kalMonat = new Date(gewaehlt); kalTag = new Date(gewaehlt); }
-  if(a === "eintraege") einSub = null;
+  view = a;
+  if(a === "kalender"){ calendarMonth = new Date(selectedDate); calendarDay = new Date(selectedDate); }
+  if(a === "eintraege") entrySub = null;
   zeichne();
 }
 $("#rTag").onclick = () => zeigeAnsicht("tag");
 $("#rKal").onclick = () => zeigeAnsicht("kalender");
 $("#rEin").onclick = () => zeigeAnsicht("eintraege");
 $("#rZeu").onclick = () => zeigeAnsicht("zeugnis");
-$("#btnEdit").onclick = () => { bearbeiten = !bearbeiten; zeichne(); };
-$("#btnHeute").onclick = () => { gewaehlt = new Date(); zeichne(); };
-$("#wocheZurueck").onclick = () => { gewaehlt = plusTage(gewaehlt,-7); zeichne(); };
-$("#wocheVor").onclick     = () => { gewaehlt = plusTage(gewaehlt, 7); zeichne(); };
-$("#monatMinus").onclick = () => { kalMonat = new Date(kalMonat.getFullYear(), kalMonat.getMonth()-1, 1); zeichne(); };
-$("#monatPlus").onclick  = () => { kalMonat = new Date(kalMonat.getFullYear(), kalMonat.getMonth()+1, 1); zeichne(); };
+$("#btnEdit").onclick = () => { editing = !editing; zeichne(); };
+$("#btnHeute").onclick = () => { selectedDate = new Date(); zeichne(); };
+$("#wocheZurueck").onclick = () => { selectedDate = addDays(selectedDate,-7); zeichne(); };
+$("#wocheVor").onclick     = () => { selectedDate = addDays(selectedDate, 7); zeichne(); };
+$("#monatMinus").onclick = () => { calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth()-1, 1); zeichne(); };
+$("#monatPlus").onclick  = () => { calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth()+1, 1); zeichne(); };
 $("#tage").onclick = e => {
   const b = e.target.closest("[data-tag]"); if(!b) return;
   const i = +b.dataset.tag;
-  gewaehlt = plusTage(montagVon(gewaehlt), i === 5 ? 5 : i); zeichne();
+  selectedDate = addDays(mondayOf(selectedDate), i === 5 ? 5 : i); zeichne();
 };
 $("#kalHeute").onclick = () => {
-  kalTag = new Date(); kalMonat = new Date(); gewaehlt = new Date(); zeichne();
+  calendarDay = new Date(); calendarMonth = new Date(); selectedDate = new Date(); zeichne();
 };
 /* Doppeltippen selbst erkennen: das eingebaute dblclick-Ereignis bleibt aus,
    weil der erste Klick das Gitter neu zeichnet und der zweite deshalb auf
@@ -983,7 +983,7 @@ $("#gitter").onclick = e => {
   const doppelt = letzterKalTipp.datum === b.dataset.kal && jetzt - letzterKalTipp.zeit < 450;
   letzterKalTipp = {datum: doppelt ? null : b.dataset.kal, zeit: jetzt};
   if(doppelt){ kalMenuOeffnen(b.dataset.kal); return; }
-  kalTag = new Date(b.dataset.kal+"T12:00"); zeichne();
+  calendarDay = new Date(b.dataset.kal+"T12:00"); zeichne();
 };
 
 /* Wischen: eine Geste, mehrere Orte */
@@ -1002,24 +1002,24 @@ function wischen(el, beiWisch){
     beiWisch(dx < 0 ? 1 : -1);
   }, {passive:true});
 }
-wischen($("#ansichtTag"), r => { gewaehlt = plusTage(gewaehlt, r); zeichne(); });
-wischen($("#ansichtKal"), r => { kalMonat = new Date(kalMonat.getFullYear(), kalMonat.getMonth()+r, 1); zeichne(); });
-wischen($("#ansichtEin"), () => { if(einSub !== null){ einSub = null; zeichne(); } });
+wischen($("#ansichtTag"), r => { selectedDate = addDays(selectedDate, r); zeichne(); });
+wischen($("#ansichtKal"), r => { calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth()+r, 1); zeichne(); });
+wischen($("#ansichtEin"), () => { if(entrySub !== null){ entrySub = null; zeichne(); } });
 const ansichtWisch = r => {
-  if(ansicht === "eintraege" && einSub !== null){ einSub = null; zeichne(); return; }
-  const i = ANSICHTEN.indexOf(ansicht);
+  if(view === "eintraege" && entrySub !== null){ entrySub = null; zeichne(); return; }
+  const i = ANSICHTEN.indexOf(view);
   zeigeAnsicht(ANSICHTEN[(i + r + ANSICHTEN.length) % ANSICHTEN.length]);
 };
 wischen($("#fuss"), ansichtWisch);
 wischen($("#leerraum"), ansichtWisch);
 $("#wischPunkte").onclick = () => {
-  if(ansicht === "eintraege" && einSub !== null){ einSub = null; zeichne(); return; }
-  const i = ANSICHTEN.indexOf(ansicht);
+  if(view === "eintraege" && entrySub !== null){ entrySub = null; zeichne(); return; }
+  const i = ANSICHTEN.indexOf(view);
   zeigeAnsicht(ANSICHTEN[(i+1) % ANSICHTEN.length]);
 };
 /* Tippen neben den Inhalt einer Unterliste führt zurück */
 $("#ansichtEin").addEventListener("click", e => {
-  if(einSub !== null && e.target === $("#ansichtEin")){ einSub = null; zeichne(); }
+  if(entrySub !== null && e.target === $("#ansichtEin")){ entrySub = null; zeichne(); }
 });
 /* Kalenderfeld gedrückt halten, doppelt antippen oder rechts klicken:
    Auswahl, was an diesem Tag eingetragen werden soll. */
@@ -1049,12 +1049,12 @@ $("#ansichtEin").addEventListener("click", e => {
 let kalMenuDatum = null;
 function kalMenuOeffnen(datum){
   kalMenuDatum = datum;
-  kalTag = new Date(datum + "T12:00");
-  const frei = freiAm(kalTag);
+  calendarDay = new Date(datum + "T12:00");
+  const frei = holidayOn(calendarDay);
   const eigen = ferien.find(f => f.typ === "eigen" && datum >= f.von && datum <= f.bis);
   $("#kmTitel").textContent =
-    kalTag.toLocaleDateString("de-DE",{weekday:"long",day:"2-digit",month:"long",year:"numeric"});
-  const dran = sonderTag(kalTag).length + eintraegeAm(kalTag).length;
+    calendarDay.toLocaleDateString("de-DE",{weekday:"long",day:"2-digit",month:"long",year:"numeric"});
+  const dran = eventsForDay(calendarDay).length + entriesForDay(calendarDay).length;
   $("#kmStand").textContent = [
     frei ? frei.name + (frei.typ === "feiertag" ? " · Feiertag"
                       : frei.typ === "eigen" ? " · eigener freier Tag" : " · Ferien") : "",
@@ -1080,7 +1080,7 @@ let tagFreiDatum = null;
 function tagFreiOeffnen(datum){
   tagFreiDatum = datum;
   const vorhanden = ferien.find(f => f.typ === "eigen" && datum >= f.von && datum <= f.bis);
-  $("#tfDatum").textContent = zeigDatum(datum);
+  $("#tfDatum").textContent = formatDate(datum);
   tfName.value = vorhanden ? vorhanden.name : "";
   tfBis.value = vorhanden ? vorhanden.bis : datum;
   $("#bTagFreiWeg").classList.toggle("hidden", !vorhanden);
@@ -1093,11 +1093,11 @@ $("#bTagFreiSpeichern").onclick = () => {
   ferien = ferien.filter(f => !(f.typ === "eigen" && tagFreiDatum >= f.von && tagFreiDatum <= f.bis));
   ferien.push({von:tagFreiDatum, bis, name, typ:"eigen"});
   ferien.sort((a,b) => a.von.localeCompare(b.von));
-  sichern(); dlgTagFrei.close(); zeichne();
+  saveAll(); dlgTagFrei.close(); zeichne();
 };
 $("#bTagFreiWeg").onclick = () => {
   ferien = ferien.filter(f => !(f.typ === "eigen" && tagFreiDatum >= f.von && tagFreiDatum <= f.bis));
-  sichern(); dlgTagFrei.close(); zeichne();
+  saveAll(); dlgTagFrei.close(); zeichne();
 };
 
 /* Dialoge: Tippen auf den Hintergrund schließt */
@@ -1139,47 +1139,47 @@ $("#plan").onclick = e => {
   const b = e.target.closest("[data-block]"); if(!b) return;
   if(langDruck){ langDruck = false; return; }
   offenerBlock = +b.dataset.block;
-  if(bearbeiten){ blockDialog(); return; }
-  const o = sonderAn(gewaehlt, offenerBlock);
+  if(editing){ blockDialog(); return; }
+  const o = eventAt(selectedDate, offenerBlock);
   if(o){ ereignisOeffnen(o.id); return; }
   schnellDialog();
 };
 
 function blockDialog(){
-  const woche = wocheFuer(gewaehlt), tag = TAGE[tagIndex(gewaehlt)];
+  const woche = weekFor(selectedDate), tag = TAGE[dayIndex(selectedDate)];
   const f = plan[woche][tag][offenerBlock] || {};
   fFach.value = f.fach || ""; fRaum.value = f.raum || ""; fLK.value = f.lk || "";
-  $("#dlgBlockTitel").textContent = `${LANG[tag]}, ${cfg.slots[offenerBlock].std.replace(/,/g,"/")}. Stunde`;
-  $("#dlgBlockZeit").textContent = `${cfg.slots[offenerBlock].von} – ${cfg.slots[offenerBlock].bis}`;
+  $("#dlgBlockTitel").textContent = `${LANG[tag]}, ${config.slots[offenerBlock].std.replace(/,/g,"/")}. Stunde`;
+  $("#dlgBlockZeit").textContent = `${config.slots[offenerBlock].von} – ${config.slots[offenerBlock].bis}`;
   const h = $("#hinweisWoche");
-  h.classList.toggle("hidden", !cfg.zweiWochen);
+  h.classList.toggle("hidden", !config.zweiWochen);
   h.textContent = `Gilt nur für die ${woche}-Woche.`;
   dlgBlock.showModal();
 }
 $("#bBlockAb").onclick = () => dlgBlock.close();
 $("#bBlockSpeichern").onclick = () => {
-  /* Groß wie überall sonst — sonst zählen „Ch" und „CH" als zwei Fächer. */
+  /* Groß wie überall sonst — sonst zählen „Ch" und „CH" als pad2 Fächer. */
   const fach = fFach.value.trim().toUpperCase();
-  plan[wocheFuer(gewaehlt)][TAGE[tagIndex(gewaehlt)]][offenerBlock] =
+  plan[weekFor(selectedDate)][TAGE[dayIndex(selectedDate)]][offenerBlock] =
     fach ? {fach, raum:fRaum.value.trim(), lk:fLK.value.trim()} : null;
-  sichern(); dlgBlock.close(); zeichne();
+  saveAll(); dlgBlock.close(); zeichne();
 };
 $("#bBlockLeeren").onclick = () => {
-  plan[wocheFuer(gewaehlt)][TAGE[tagIndex(gewaehlt)]][offenerBlock] = null;
-  sichern(); dlgBlock.close(); zeichne();
+  plan[weekFor(selectedDate)][TAGE[dayIndex(selectedDate)]][offenerBlock] = null;
+  saveAll(); dlgBlock.close(); zeichne();
 };
 
 const schnellFach = () => {
-  const f = plan[wocheFuer(gewaehlt)][TAGE[tagIndex(gewaehlt)]][offenerBlock];
+  const f = plan[weekFor(selectedDate)][TAGE[dayIndex(selectedDate)]][offenerBlock];
   return f ? f.fach : "";
 };
 function schnellDialog(){
   const fach = schnellFach();
-  if(!fach){ eintragOeffnen(null, gewaehlt, "E", "", offenerBlock); return; }
-  const s = cfg.slots[offenerBlock];
-  $("#schnellTitel").textContent = fachName(fach);
+  if(!fach){ eintragOeffnen(null, selectedDate, "E", "", offenerBlock); return; }
+  const s = config.slots[offenerBlock];
+  $("#schnellTitel").textContent = subjectName(fach);
   $("#schnellZeit").textContent = `${s.von} – ${s.bis}`;
-  const naechste = naechsterTagMitFach(gewaehlt, fach.toUpperCase());
+  const naechste = nextDayWithSubject(selectedDate, fach.toUpperCase());
   $("#bSchnellHAZiel").textContent = naechste
     ? "fällig " + naechste.toLocaleDateString("de-DE",{weekday:"short",day:"2-digit",month:"2-digit"})
     : "kein weiterer Termin";
@@ -1189,52 +1189,52 @@ const schnell = (typ, datum, extra) => { dlgSchnell.close();
   eintragOeffnen(null, datum, typ, schnellFach(), offenerBlock, extra); };
 $("#bSchnellHA").onclick = () => {
   const fach = schnellFach();
-  schnell("H", naechsterTagMitFach(gewaehlt, fach.toUpperCase()) || plusTage(gewaehlt,1));
+  schnell("H", nextDayWithSubject(selectedDate, fach.toUpperCase()) || addDays(selectedDate,1));
 };
-$("#bSchnellNotiz").onclick   = () => schnell("N", gewaehlt);
-$("#bSchnellKlausur").onclick = () => schnell("K", gewaehlt);
+$("#bSchnellNotiz").onclick   = () => schnell("N", selectedDate);
+$("#bSchnellKlausur").onclick = () => schnell("K", selectedDate);
 $("#bSchnellFehl").onclick = () => {
-  const std = (cfg.slots[offenerBlock].std || "1").split(",").length;
+  const std = (config.slots[offenerBlock].std || "1").split(",").length;
   dlgSchnell.close();
-  eintragOeffnen(null, gewaehlt, "F", "", offenerBlock, {stunden:std});
+  eintragOeffnen(null, selectedDate, "F", "", offenerBlock, {stunden:std});
 };
 $("#bSchnellAusfall").onclick = () => {
   dlgSchnell.close();
-  const datum = iso(gewaehlt);
+  const datum = iso(selectedDate);
   sonder = sonder.filter(x => !(x.datum === datum && x.slot === offenerBlock));
-  sonder.push({id:neueId(), datum, slot:offenerBlock, art:"ausfall",
+  sonder.push({id:newId(), datum, slot:offenerBlock, art:"ausfall",
                titel:"Fällt aus", raum:"", notiz:"", geloescht:false});
-  sichern(); zeichne();
+  saveAll(); zeichne();
 };
 $("#bSchnellVertretung").onclick = () => {
-  dlgSchnell.close(); eintragOeffnen(null, gewaehlt, "E", "", offenerBlock, {art:"vertretung"});
+  dlgSchnell.close(); eintragOeffnen(null, selectedDate, "E", "", offenerBlock, {art:"vertretung"});
 };
 $("#bSchnellErsatz").onclick = () => {
-  dlgSchnell.close(); eintragOeffnen(null, gewaehlt, "E", "", offenerBlock);
+  dlgSchnell.close(); eintragOeffnen(null, selectedDate, "E", "", offenerBlock);
 };
 /* Langes Drücken gibt es mit Tastatur nicht — hier führt derselbe Weg hin. */
 $("#bSchnellInfo").onclick = () => { dlgSchnell.close(); fachInfo(offenerBlock); };
 
 /** Alles, was die App über ein Fach weiß. */
 function fachInfo(i){
-  const f = plan[wocheFuer(gewaehlt)][TAGE[tagIndex(gewaehlt)]][i];
+  const f = plan[weekFor(selectedDate)][TAGE[dayIndex(selectedDate)]][i];
   if(!f) return;
   const k = f.fach.toUpperCase();
   fachInfoFach = k;
   let stunden = 0;
   ["A","B"].forEach(w => TAGE.forEach(t =>
     (plan[w][t]||[]).forEach(x => { if(x && x.fach.toUpperCase() === k) stunden++; })));
-  const proWoche = cfg.zweiWochen ? stunden/2 : stunden;
-  const naechste = naechsterTagMitFach(gewaehlt, k);
+  const proWoche = config.zweiWochen ? stunden/2 : stunden;
+  const naechste = nextDayWithSubject(selectedDate, k);
   const sch = notenSchnitt(k);
-  const offen = aktiv().filter(e => !e.erledigt && e.fach === k && (e.typ === "H" || e.typ === "K"));
-  const mb = aktiv().filter(e => e.fach === k && e.typ === "M").length;
+  const offen = activeEntries().filter(e => !e.erledigt && e.fach === k && (e.typ === "H" || e.typ === "K"));
+  const mb = activeEntries().filter(e => e.fach === k && e.typ === "M").length;
 
-  $("#fiTitel").textContent = fachName(k);
-  $("#fiKuerzel").textContent = fachName(k) === k ? "" : k;
+  $("#fiTitel").textContent = subjectName(k);
+  $("#fiKuerzel").textContent = subjectName(k) === k ? "" : k;
   const zeile = (a,b) => `<div class="fiZeile"><span>${a}</span><span>${b}</span></div>`;
   $("#fiInhalt").innerHTML =
-    zeile("Lehrkraft", f.lk ? esc(lehrerName(f.lk)) : "—") +
+    zeile("Lehrkraft", f.lk ? esc(teacherName(f.lk)) : "—") +
     zeile("Raum", esc(f.raum) || "—") +
     zeile("Stunden je Woche", proWoche % 1 ? proWoche.toFixed(1) : String(proWoche)) +
     (naechste ? `<div class="fiZeile"><span>Als Nächstes</span>
@@ -1250,11 +1250,11 @@ $("#bFachAb").onclick = () => dlgFach.close();
 $("#fiInhalt").onclick = e => {
   const b = e.target.closest("[data-zukalender]"); if(!b) return;
   dlgFach.close();
-  kalTag = new Date(b.dataset.zukalender+"T12:00");
-  kalMonat = new Date(kalTag);
-  ansicht = "kalender"; zeichne();
+  calendarDay = new Date(b.dataset.zukalender+"T12:00");
+  calendarMonth = new Date(calendarDay);
+  view = "kalender"; zeichne();
 };
-$("#bFachMerk").onclick = () => { dlgFach.close(); ansicht = "eintraege"; einSub = "M"; zeichne(); };
+$("#bFachMerk").onclick = () => { dlgFach.close(); view = "eintraege"; entrySub = "M"; zeichne(); };
 
 /* =====================================================================
    Eintragsdialog — eine Oberfläche für alle Arten
@@ -1262,7 +1262,7 @@ $("#bFachMerk").onclick = () => { dlgFach.close(); ansicht = "eintraege"; einSub
 let bearbeiteId = null, ereignisId = null, noteId = null, bilder = [], ereignisArt = "ereignis";
 
 function fachAuswahlFuellen(wert){
-  const liste = alleFaecher();
+  const liste = allSubjects();
   eFach.innerHTML = `<option value="">— keins —</option>` +
     liste.map(f => `<option ${f === wert ? "selected" : ""}>${esc(f)}</option>`).join("") +
     `<option value="__frei">Anderes …</option>`;
@@ -1281,7 +1281,7 @@ eTyp.onchange = artUmschalten;
 
 function stundenAuswahlFuellen(slot){
   eStunde.innerHTML = `<option value="">ganzer Tag</option>` +
-    cfg.slots.map((s,i) => `<option value="${i}" ${i === slot ? "selected" : ""}>${stdText(s)} · ${esc(s.von)}</option>`).join("");
+    config.slots.map((s,i) => `<option value="${i}" ${i === slot ? "selected" : ""}>${stdText(s)} · ${esc(s.von)}</option>`).join("");
   if(slot === null || slot === undefined) eStunde.value = "";
 }
 function artUmschalten(){
@@ -1296,7 +1296,7 @@ function artUmschalten(){
   $("#eTextLabel").textContent = merk ? "Überschrift" : "Was";
   $("#eNotizLabel").textContent = merk ? "Inhalt" : "Notizen";
   eNotiz.style.minHeight = merk ? "220px" : "";
-  $("#eWertLabel").textContent = cfg.notenSystem === "punkte15" ? "Punkte 0–15" : "Note 1–6";
+  $("#eWertLabel").textContent = config.notenSystem === "punkte15" ? "Punkte 0–15" : "Note 1–6";
   if(ev) $("#eFachFreiWrap").classList.add("hidden"); else freiUmschalten();
   bilderZeichnen();
 }
@@ -1312,14 +1312,14 @@ function datumFeldText(){
 function zeichneDatumWahl(){
   const fach = aktuellesFach();
   $("#eMonatLabel").textContent = eMonat.toLocaleDateString("de-DE",{month:"long",year:"numeric"});
-  const start = montagVon(new Date(eMonat.getFullYear(), eMonat.getMonth(), 1));
+  const start = mondayOf(new Date(eMonat.getFullYear(), eMonat.getMonth(), 1));
   let html = ["Mo","Di","Mi","Do","Fr","Sa","So"].map(t => `<div class="wt">${t}</div>`).join("");
   for(let i = 0; i < 42; i++){
-    const d = plusTage(start, i);
+    const d = addDays(start, i);
     html += `<button type="button" class="tagfeld ${d.getMonth() !== eMonat.getMonth() ? "fremd" : ""}
-       ${gleich(d,new Date()) ? "heute" : ""} ${freiAm(d) ? "ferien" : ""}"
+       ${sameDate(d,new Date()) ? "heute" : ""} ${holidayOn(d) ? "ferien" : ""}"
        aria-pressed="${eDatum.value === iso(d)}" data-wahl="${iso(d)}">
-       ${d.getDate()}${hatFachAm(d,fach) ? '<span class="punktfach"></span>' : ""}</button>`;
+       ${d.getDate()}${hasSubjectOn(d,fach) ? '<span class="punktfach"></span>' : ""}</button>`;
   }
   $("#eGitter").innerHTML = html;
   $("#eGitterHinweis").textContent = fach
@@ -1371,7 +1371,7 @@ function bildVerkleinern(datei, fertig){
       c.getContext("2d").drawImage(bild, 0, 0, c.width, c.height);
       fertig(c.toDataURL("image/jpeg", 0.7));
     };
-    bild.onerror = () => zeigeFehler("Bild ließ sich nicht lesen.");
+    bild.onerror = () => showError("Bild ließ sich nicht lesen.");
     bild.src = leser.result;
   };
   leser.readAsDataURL(datei);
@@ -1379,8 +1379,8 @@ function bildVerkleinern(datei, fertig){
 
 /* --- Öffnen --- */
 function standardArt(){
-  if(ansicht === "eintraege" && einSub && ARTLANG[einSub] && einSub !== "archiv") return einSub;
-  if(ansicht === "zeugnis") return "G";
+  if(view === "eintraege" && entrySub && ARTLANG[entrySub] && entrySub !== "archiv") return entrySub;
+  if(view === "zeugnis") return "G";
   return "H";
 }
 function eintragOeffnen(e, datum, typ, fach, slot, extra){
@@ -1389,8 +1389,8 @@ function eintragOeffnen(e, datum, typ, fach, slot, extra){
   ereignisArt = (extra && extra.art) || "ereignis";
   eWert.value = ""; eNArt.value = "s"; eOrt.value = ""; eFehlArt.value = "entschuldigt";
   eFehlStd.value = 1;
-  const d = datum || gewaehlt;
-  const vorhanden = (typ === "E" && slot !== undefined && slot !== null) ? sonderAn(d, slot) : null;
+  const d = datum || selectedDate;
+  const vorhanden = (typ === "E" && slot !== undefined && slot !== null) ? eventAt(d, slot) : null;
   if(vorhanden){ ereignisId = vorhanden.id; ereignisArt = vorhanden.art || "ereignis"; }
 
   $("#dlgEintragTitel").textContent = (e || vorhanden) ? "Eintrag ändern" : "Neuer Eintrag";
@@ -1434,7 +1434,7 @@ function noteOeffnen(n){
   $("#bEintragWeg").classList.remove("hidden");
   dlgEintrag.showModal();
 }
-$("#btnEintrag").onclick = () => eintragOeffnen(null, ansicht === "kalender" ? kalTag : gewaehlt);
+$("#btnEintrag").onclick = () => eintragOeffnen(null, view === "kalender" ? calendarDay : selectedDate);
 $("#bEintragAb").onclick = () => dlgEintrag.close();
 
 $("#bEintragSpeichern").onclick = () => {
@@ -1447,21 +1447,21 @@ $("#bEintragSpeichern").onclick = () => {
     const slot = eStunde.value === "" ? null : +eStunde.value;
     if(ereignisId) sonder = sonder.filter(x => x.id !== ereignisId);
     else if(slot !== null) sonder = sonder.filter(x => !(x.datum === datum && x.slot === slot));
-    if(titel) sonder.push({id:neueId(), datum, slot, art:ereignisArt, titel,
+    if(titel) sonder.push({id:newId(), datum, slot, art:ereignisArt, titel,
                            raum:eOrt.value.trim(), notiz:eNotiz.value.trim(), geloescht:false});
-    sichern(); dlgEintrag.close(); zeichne(); return;
+    saveAll(); dlgEintrag.close(); zeichne(); return;
   }
   if(t === "G"){
     const wert = parseFloat(String(eWert.value).replace(",", "."));
-    const grenze = cfg.notenSystem === "punkte15" ? [0,15] : [1,6];
+    const grenze = config.notenSystem === "punkte15" ? [0,15] : [1,6];
     if(isNaN(wert) || wert < grenze[0] || wert > grenze[1])
       return alert(`Bitte einen Wert zwischen ${grenze[0]} und ${grenze[1]} eingeben.`);
     if(!fach) return alert("Bitte ein Fach wählen.");
     const nd = {fach, art:eNArt.value, wert, datum, titel:eText.value.trim(), notiz:eNotiz.value.trim()};
     const alteNote = noteId && noten.find(x => x.id === noteId);
     if(alteNote) Object.assign(alteNote, nd);
-    else noten.push(Object.assign({id:neueId(), geloescht:false}, nd));
-    sichern(); dlgEintrag.close(); zeichne(); return;
+    else noten.push(Object.assign({id:newId(), geloescht:false}, nd));
+    saveAll(); dlgEintrag.close(); zeichne(); return;
   }
   if(!fach && t === "M") return alert("Bitte ein Fach wählen.");
   const jetzt = new Date();
@@ -1471,20 +1471,20 @@ $("#bEintragSpeichern").onclick = () => {
   if(t === "F") daten.stunden = Math.max(1, Number(eFehlStd.value) || 1);
   if(t === "M"){
     daten.bilder = bilder.slice();
-    daten.zeit = `${zwei(jetzt.getHours())}:${zwei(jetzt.getMinutes())}`;
-    if(!daten.titel) daten.titel = "Merkblatt vom " + zeigDatum(datum);
+    daten.zeit = `${pad2(jetzt.getHours())}:${pad2(jetzt.getMinutes())}`;
+    if(!daten.titel) daten.titel = "Merkblatt vom " + formatDate(datum);
   }
   const alter = bearbeiteId && eintraege.find(x => x.id === bearbeiteId);
   if(alter) Object.assign(alter, daten);
-  else eintraege.push(Object.assign({id:neueId(), erledigt:false, geloescht:false}, daten));
-  sichern(); dlgEintrag.close(); zeichne();
+  else eintraege.push(Object.assign({id:newId(), erledigt:false, geloescht:false}, daten));
+  saveAll(); dlgEintrag.close(); zeichne();
 };
 $("#bEintragWeg").onclick = () => {
   const ziel = ereignisId ? sonder.find(x => x.id === ereignisId)
              : noteId     ? noten.find(x => x.id === noteId)
              :              eintraege.find(x => x.id === bearbeiteId);
-  if(ziel) insArchiv(ziel);
-  sichern(); dlgEintrag.close(); zeichne();
+  if(ziel) moveToArchive(ziel);
+  saveAll(); dlgEintrag.close(); zeichne();
 };
 
 /* --- Merkblatt ansehen --- */
@@ -1493,7 +1493,7 @@ function schauOeffnen(id){
   const e = eintraege.find(x => x.id === id); if(!e) return;
   schauId = id;
   $("#schauTitel").textContent = e.titel || "Merkblatt";
-  $("#schauStand").textContent = `${fachName(e.fach)} · ${zeigDatum(e.datum)}${e.zeit ? " · "+e.zeit : ""}`;
+  $("#schauStand").textContent = `${subjectName(e.fach)} · ${formatDate(e.datum)}${e.zeit ? " · "+e.zeit : ""}`;
   $("#schauText").textContent = e.notiz || "";
   $("#schauBilder").innerHTML = (e.bilder||[]).map(b => `<img src="${esc(b)}" alt="">`).join("");
   dlgSchau.showModal();
@@ -1510,7 +1510,7 @@ function listenKlick(e){
     const it = eintraege.find(x => x.id === hak.dataset.hak);
     if(!it){ zeichne(); return; }              // in einem anderen Tab entfernt
     it.erledigt = hak.checked; it.erledigtAm = hak.checked ? iso(new Date()) : null;
-    sichern(); zeichne(); return;
+    saveAll(); zeichne(); return;
   }
   const schau = e.target.closest("[data-schau]");
   if(schau){ schauOeffnen(schau.dataset.schau); return; }
@@ -1529,8 +1529,8 @@ $("#einListe").addEventListener("click", e => {
   if(zurueck){
     const [art,id] = zurueck.dataset.zurueck.split(":");
     const it = archivFinden(art,id);
-    if(it){ ausArchiv(it); if(art === "eintrag"){ it.erledigt = false; it.erledigtAm = null; } }
-    sichern(); zeichne(); return;
+    if(it){ restoreFromArchive(it); if(art === "eintrag"){ it.erledigt = false; it.erledigtAm = null; } }
+    saveAll(); zeichne(); return;
   }
   const weg = e.target.closest("[data-endgueltig]");
   if(weg && confirm("Endgültig löschen? Das lässt sich nicht rückgängig machen.")){
@@ -1538,12 +1538,12 @@ $("#einListe").addEventListener("click", e => {
     if(art === "eintrag") eintraege = eintraege.filter(x => x.id !== id);
     else if(art === "ereignis") sonder = sonder.filter(x => x.id !== id);
     else noten = noten.filter(x => x.id !== id);
-    sichern(); zeichne();
+    saveAll(); zeichne();
   }
 });
 $("#einMenu").onclick = e => {
   const b = e.target.closest("[data-sub]"); if(!b) return;
-  einSub = b.dataset.sub; zeichne();
+  entrySub = b.dataset.sub; zeichne();
 };
 $("#zeuListe").onclick = e => {
   const b = e.target.closest("[data-zeufach]"); if(!b) return;
@@ -1559,13 +1559,13 @@ function suchen(){
   if(!q){ ul.innerHTML = ""; return; }
   /* Kürzel und ausgeschriebener Name gelten als dasselbe: Wer „Chemie" sucht,
      findet auch Einträge, die nur „CH" tragen — sofern es in den Einstellungen steht. */
-  const suchtext = o => [o.fach, fachName(o.fach), lehrerName(o.fach), o.titel, o.notiz, o.raum]
+  const suchtext = o => [o.fach, subjectName(o.fach), teacherName(o.fach), o.titel, o.notiz, o.raum]
     .filter(Boolean).join(" ").toLowerCase();
   const treffer = [
-    ...aktiv().filter(e => suchtext(e).includes(q)),
-    ...notenAktiv().filter(n => suchtext(n).includes(q))
+    ...activeEntries().filter(e => suchtext(e).includes(q)),
+    ...activeGrades().filter(n => suchtext(n).includes(q))
       .map(n => ({id:n.id, typ:"G", fach:n.fach, titel:`${notenText(n.wert)} ${n.titel||""}`, datum:n.datum, note:true})),
-    ...sonderAktiv().filter(o => suchtext(o).includes(q))
+    ...activeEvents().filter(o => suchtext(o).includes(q))
       .map(o => ({id:o.id, typ:"E", fach:"", titel:o.titel, datum:o.datum, ereignis:true}))
   ].sort((a,b) => b.datum.localeCompare(a.datum)).slice(0, 40);
   ul.innerHTML = treffer.map(e => `<li>
@@ -1574,7 +1574,7 @@ function suchen(){
        : e.typ === "M" ? `data-schau="${e.id}"` : `data-bearbeite="${e.id}"`}>
       <div class="kopf"><span class="khn">${e.typ}</span>
         <span class="titel">${e.fach ? esc(e.fach)+" — " : ""}${esc(e.titel) || ART[e.typ] || ""}</span></div>
-      <div class="wann">${zeigDatum(e.datum)}</div></div></li>`).join("")
+      <div class="wann">${formatDate(e.datum)}</div></div></li>`).join("")
     || `<li><div class="wachs"><span class="titel" style="color:var(--muted)">Nichts gefunden.</span></div></li>`;
 }
 
@@ -1582,8 +1582,8 @@ function suchen(){
 let anteilFach = null;
 function anteilOeffnen(fach){
   anteilFach = fach;
-  $("#anTitel").textContent = fachName(fach);
-  anWert.value = anteilFuer(fach);
+  $("#anTitel").textContent = subjectName(fach);
+  anWert.value = weightFor(fach);
   anZiel.value = ""; $("#anZielErgebnis").textContent = "";
   anteilVorschau();
   dlgAnteil.showModal();
@@ -1599,11 +1599,11 @@ function zielRechnen(){
   const feld = $("#anZielErgebnis");
   if(isNaN(ziel)){ feld.textContent = ""; return; }
   const art = anZielArt.value;
-  const eigene = notenAktiv().filter(n => n.fach === anteilFach);
+  const eigene = activeGrades().filter(n => n.fach === anteilFach);
   const derArt = eigene.filter(n => n.art === art);
   const andere = eigene.filter(n => n.art !== art);
   const mittel = l => l.length ? l.reduce((s,n) => s+n.wert, 0)/l.length : null;
-  const aM = anteilFuer(anteilFach)/100;
+  const aM = weightFor(anteilFach)/100;
   const gew = art === "m" ? aM : 1-aM;
   const andMittel = mittel(andere);
   const n = derArt.length;
@@ -1614,7 +1614,7 @@ function zielRechnen(){
     const rest = (ziel - andMittel*(1-gew)) / gew;
     noetig = rest*(n+1) - derArt.reduce((s,v) => s+v.wert, 0);
   }
-  const grenze = cfg.notenSystem === "punkte15" ? [0,15] : [1,6];
+  const grenze = config.notenSystem === "punkte15" ? [0,15] : [1,6];
   const machbar = noetig >= grenze[0] && noetig <= grenze[1];
   feld.textContent = machbar
     ? `Die nächste ${art === "m" ? "mündliche" : "schriftliche"} Note müsste ${notenText(noetig)} sein.`
@@ -1622,13 +1622,13 @@ function zielRechnen(){
 }
 anZiel.oninput = zielRechnen; anZielArt.onchange = zielRechnen;
 $("#bAnStandard").onclick = () => {
-  if(cfg.anteile) delete cfg.anteile[anteilFach];
-  sichern(); dlgAnteil.close(); zeichne();
+  if(config.anteile) delete config.anteile[anteilFach];
+  saveAll(); dlgAnteil.close(); zeichne();
 };
 $("#bAnSpeichern").onclick = () => {
-  if(!cfg.anteile) cfg.anteile = {};
-  cfg.anteile[anteilFach] = Math.max(0, Math.min(100, Number(anWert.value) || 0));
-  sichern(); dlgAnteil.close(); zeichne();
+  if(!config.anteile) config.anteile = {};
+  config.anteile[anteilFach] = Math.max(0, Math.min(100, Number(anWert.value) || 0));
+  saveAll(); dlgAnteil.close(); zeichne();
 };
 
 /* =====================================================================
@@ -1656,7 +1656,7 @@ function textLesen(text){
   return proStunde;
 }
 function importTabelle(werte){
-  $("#iTabelle").innerHTML = cfg.slots.map((sl,i) => {
+  $("#iTabelle").innerHTML = config.slots.map((sl,i) => {
     const v = werte[i] || {};
     return `<div class="izeile" data-zeile="${i}">
       <div class="std">${stdText(sl)}</div>
@@ -1671,20 +1671,20 @@ const importAuslesen = () => [...document.querySelectorAll("#iTabelle .izeile")]
   raum:z.querySelector('[data-f=raum]').value.trim(),
   lk:z.querySelector('[data-f=lk]').value.trim()
 }));
-const importLaden = () => importTabelle((plan[cfg.zweiWochen ? iWoche.value : "A"][TAGE[+iTag.value]] || []).map(x => x || {}));
+const importLaden = () => importTabelle((plan[config.zweiWochen ? iWoche.value : "A"][TAGE[+iTag.value]] || []).map(x => x || {}));
 let zurueckZuEinst = false;
 function importOeffnen(){
   iTag.innerHTML = TAGE.map((t,i) =>
-    `<option value="${i}" ${i === Math.min(tagIndex(gewaehlt),4) ? "selected" : ""}>${LANG[t]}</option>`).join("");
-  iWoche.value = wocheFuer(gewaehlt);
-  $("#iWocheWrap").classList.toggle("hidden", !cfg.zweiWochen);
+    `<option value="${i}" ${i === Math.min(dayIndex(selectedDate),4) ? "selected" : ""}>${LANG[t]}</option>`).join("");
+  iWoche.value = weekFor(selectedDate);
+  $("#iWocheWrap").classList.toggle("hidden", !config.zweiWochen);
   iText.value = ""; $("#iErgebnis").textContent = "";
   importLaden(); dlgImport.showModal();
 }
 iTag.onchange = importLaden; iWoche.onchange = importLaden;
 $("#bImportText").onclick = () => {
   const proStunde = textLesen(iText.value);
-  const werte = cfg.slots.map(sl => {
+  const werte = config.slots.map(sl => {
     const z = sl.std.split(",").map(x => proStunde[x.trim()]).find(Boolean);
     return z ? {fach:z.fach, raum:z.raum, lk:z.lk || z.klasse} : {};
   });
@@ -1694,12 +1694,12 @@ $("#bImportText").onclick = () => {
 };
 $("#bImportAb").onclick = () => { dlgImport.close(); if(zurueckZuEinst){ zurueckZuEinst = false; einstellungenOeffnen(); } };
 $("#bImportSpeichern").onclick = () => {
-  const woche = cfg.zweiWochen ? iWoche.value : "A", tag = TAGE[+iTag.value];
+  const woche = config.zweiWochen ? iWoche.value : "A", tag = TAGE[+iTag.value];
   importAuslesen().forEach((w,i) => {
     plan[woche][tag][i] = w.fach ? {fach:w.fach.toUpperCase(), raum:w.raum, lk:w.lk} : null; });
-  sichern(); dlgImport.close();
+  saveAll(); dlgImport.close();
   if(zurueckZuEinst){ zurueckZuEinst = false; zeichne(); einstellungenOeffnen(); return; }
-  ansicht = "tag"; gewaehlt = plusTage(montagVon(gewaehlt), +iTag.value); zeichne();
+  view = "tag"; selectedDate = addDays(mondayOf(selectedDate), +iTag.value); zeichne();
 };
 
 /* =====================================================================
@@ -1707,8 +1707,8 @@ $("#bImportSpeichern").onclick = () => {
    ===================================================================== */
 function profilKnopf(){
   const el = $("#btnProfil"); if(!el) return;
-  el.textContent = (profilName().trim()[0] || "P").toUpperCase();
-  el.setAttribute("aria-label", "Profil: " + profilName());
+  el.textContent = (profileName().trim()[0] || "P").toUpperCase();
+  el.setAttribute("aria-label", "Profil: " + profileName());
 }
 let profilVerwalten = false, profilManuell = false;
 function zeichneProfilAuswahl(){
@@ -1716,7 +1716,7 @@ function zeichneProfilAuswahl(){
   $("#pVerwalten").textContent = profilVerwalten ? "Fertig" : "Verwalten";
   $("#pZurueck").classList.toggle("hidden", !profilManuell || profilVerwalten);
   const kacheln = profile.map((x,i) => `<div>
-    <button type="button" class="kachel" data-wechsel="${x.id}" aria-current="${x.id === profilId}">
+    <button type="button" class="kachel" data-wechsel="${x.id}" aria-current="${x.id === profileId}">
       <div class="feld"><span>${esc((x.name.trim()[0]||"P").toUpperCase())}</span></div>
       <div class="kname">${esc(x.name)}</div>
       <div class="knum">Profil ${String(i+1).padStart(2,"0")}</div></button>
@@ -1742,33 +1742,33 @@ $("#pGitter").onclick = e => {
   if(e.target.closest("#kachelNeu")){
     const name = prompt("Name des neuen Profils", "Profil " + (profile.length+1));
     if(!name || !name.trim()) return;
-    const id = neueId();
-    profile.push({id, name:name.trim()}); profilId = id; profileSichern();
-    zustandLaden(); normalisiere(); sichern();
-    profilVerwalten = false; profilKnopf(); ansicht = "tag";
+    const id = newId();
+    profile.push({id, name:name.trim()}); profileId = id; saveProfiles();
+    loadState(); normalize(); saveAll();
+    profilVerwalten = false; profilKnopf(); view = "tag";
     profilAuswahlSchliessen(); zeichne(); return;
   }
   const u = e.target.closest("[data-umbenennen]");
   if(u){
     const x = profile.find(y => y.id === u.dataset.umbenennen);
     const name = prompt("Neuer Name", x.name);
-    if(name && name.trim()){ x.name = name.trim(); profileSichern(); zeichneProfilAuswahl(); profilKnopf(); }
+    if(name && name.trim()){ x.name = name.trim(); saveProfiles(); zeichneProfilAuswahl(); profilKnopf(); }
     return;
   }
   const d = e.target.closest("[data-profilweg]");
   if(d){
     const x = profile.find(y => y.id === d.dataset.profilweg);
     if(!confirm(`Profil \u201e${x.name}\u201c mit allen Daten löschen? Das lässt sich nicht rückgängig machen.`)) return;
-    profilSchluessel(x.id).forEach(k => { try{ localStorage.removeItem(k); }catch(e){} });
+    profileKeys(x.id).forEach(k => { try{ localStorage.removeItem(k); }catch(e){} });
     profile = profile.filter(y => y.id !== x.id);
-    if(profilId === x.id){ profilId = profile[0].id; zustandLaden(); normalisiere(); }
-    profileSichern(); profilKnopf(); zeichneProfilAuswahl(); zeichne(); return;
+    if(profileId === x.id){ profileId = profile[0].id; loadState(); normalize(); }
+    saveProfiles(); profilKnopf(); zeichneProfilAuswahl(); zeichne(); return;
   }
   const w = e.target.closest("[data-wechsel]");
   if(w && !profilVerwalten){
-    profilId = w.dataset.wechsel; profileSichern();
-    zustandLaden(); normalisiere(); profilKnopf();
-    ansicht = "tag"; einSub = null; gewaehlt = new Date();
+    profileId = w.dataset.wechsel; saveProfiles();
+    loadState(); normalize(); profilKnopf();
+    view = "tag"; entrySub = null; selectedDate = new Date();
     profilAuswahlSchliessen(); zeichne();
   }
 };
@@ -1808,7 +1808,7 @@ $("#sFerienLaden").onclick = async () => {
   try{
     const eigene = ferien.filter(f => f.typ === "eigen");   // selbst eingetragene behalten
     ferien = [...await ferienLaden(land), ...eigene].sort((a,b) => a.von.localeCompare(b.von));
-    cfg.land = land; sichern(); ferienStand(); zeichne();
+    config.land = land; saveAll(); ferienStand(); zeichne();
   }catch(err){
     $("#sFerienStand").textContent = (err && err.name === "AbortError")
       ? "Der Dienst antwortet nicht. Später noch einmal versuchen."
@@ -1817,13 +1817,13 @@ $("#sFerienLaden").onclick = async () => {
 };
 $("#sFerienWeg").onclick = () => {
   ferien = ferien.filter(f => f.typ === "eigen");
-  sichern(); ferienStand(); zeichne();
+  saveAll(); ferienStand(); zeichne();
 };
 function ferienStand(){
   const eigene = ferien.filter(f => f.typ === "eigen").length;
   $("#sFerienStand").textContent = (eigene ? `${zahl(eigene,"eigener Tag","eigene Tage")} · ` : "")
     + (ferien.length
-    ? `${ferien.length} Einträge gespeichert, bis ${zeigDatum(ferien.at(-1).bis)}.`
+    ? `${ferien.length} Einträge gespeichert, bis ${formatDate(ferien.at(-1).bis)}.`
     : "Noch nichts geladen.");
 }
 
@@ -1861,16 +1861,16 @@ async function melden(titel, text){
    Speicherstand mit. Nur der von heute wird gebraucht. */
 function meldemerkerAufraeumen(){
   const heute = "_gemeldet_" + iso(new Date());
-  profilSchluessel(profilId)
+  profileKeys(profileId)
     .filter(k => k.includes("_gemeldet_") && !k.endsWith(heute))
     .forEach(k => { try{ localStorage.removeItem(k); }catch(e){} });
 }
 async function erinnerungenPruefen(){
-  if(!cfg.melden) return;
+  if(!config.melden) return;
   const heute = new Date(), key = "gemeldet_" + iso(heute);
   if(Speicher.lies(key, false)) return;
-  const inTagen = n => iso(plusTage(heute, n));
-  const bisEndeWoche = aktiv().filter(e => !e.erledigt && (e.typ === "K" || e.typ === "H")
+  const inTagen = n => iso(addDays(heute, n));
+  const bisEndeWoche = activeEntries().filter(e => !e.erledigt && (e.typ === "K" || e.typ === "H")
     && e.datum >= iso(heute) && e.datum <= inTagen(7));
   const morgen = bisEndeWoche.filter(e => e.datum === inTagen(1));
   const klausuren = bisEndeWoche.filter(e => e.typ === "K");
@@ -1880,13 +1880,13 @@ async function erinnerungenPruefen(){
     text = `Diese Woche: ${zahl(klausuren.length,"Klausur","Klausuren")}, `
          + `${zahl(bisEndeWoche.length-klausuren.length,"Hausaufgabe","Hausaufgaben")}`;
   else if(klausuren.length && klausuren[0].datum <= inTagen(3))
-    text = `Klausur am ${zeigDatum(klausuren[0].datum)}: ${klausuren[0].fach||""}`;
+    text = `Klausur am ${formatDate(klausuren[0].datum)}: ${klausuren[0].fach||""}`;
   if(text && await melden("Stundenplan", text)) Speicher.schreib(key, true);
 }
 
 /* ICS-Export: damit übernimmt der Systemkalender das Erinnern. */
 const icsTag  = datum => datum.replace(/-/g,"");
-const icsFolgetag = datum => icsTag(iso(plusTage(new Date(datum+"T12:00"), 1)));
+const icsFolgetag = datum => icsTag(iso(addDays(new Date(datum+"T12:00"), 1)));
 /* Ohne VTIMEZONE gilt eine Zeit ohne Z als „schwebend" und wird in der
    Zeitzone des Kalenders gelesen — für einen Stundenplan genau richtig. */
 const icsZeit = (datum, uhr) => icsTag(datum) + "T" + uhr.replace(":","") + "00";
@@ -1905,7 +1905,7 @@ function icsBauen(){
   const roh = t => String(t == null ? "" : t).replace(/[\\;,]/g, m => "\\"+m).replace(/\r?\n/g, "\\n");
   const stempel = new Date().toISOString().replace(/[-:]/g,"").split(".")[0]+"Z";
   const zeilen = ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Stundenplan//DE","CALSCALE:GREGORIAN",
-    "METHOD:PUBLISH", `X-WR-CALNAME:${roh("Stundenplan " + (cfg.klasse || profilName()))}`];
+    "METHOD:PUBLISH", `X-WR-CALNAME:${roh("Stundenplan " + (config.klasse || profileName()))}`];
   const termin = (id, start, ende, ganztags, titel, notiz, alarm) => {
     zeilen.push("BEGIN:VEVENT", `UID:${id}@stundenplan`, `DTSTAMP:${stempel}`,
       ganztags ? `DTSTART;VALUE=DATE:${start}` : `DTSTART:${start}`,
@@ -1916,15 +1916,15 @@ function icsBauen(){
       `DESCRIPTION:${roh(titel)}`, "END:VALARM");
     zeilen.push("END:VEVENT");
   };
-  aktiv().filter(e => (e.typ === "K" || e.typ === "H") && !e.erledigt).forEach(e =>
+  activeEntries().filter(e => (e.typ === "K" || e.typ === "H") && !e.erledigt).forEach(e =>
     /* DTEND ist nach RFC 5545 ausschließend — ein Ganztagstermin endet am
        Folgetag, sonst verschlucken manche Kalender ihn. */
     termin(e.id, icsTag(e.datum), icsFolgetag(e.datum), true,
       (e.typ === "K" ? "Klausur " : "HA ") + (e.fach||"") + " " + (e.titel||""),
       e.notiz, "PT15H"));
-  sonderAktiv().filter(o => o.art !== "ausfall" && o.datum >= iso(plusTage(new Date(),-1)))
+  activeEvents().filter(o => o.art !== "ausfall" && o.datum >= iso(addDays(new Date(),-1)))
     .forEach(o => {
-      const s = o.slot !== null && cfg.slots[o.slot];
+      const s = o.slot !== null && config.slots[o.slot];
       if(s) termin(o.id, icsZeit(o.datum, s.von), icsZeit(o.datum, s.bis), false,
         o.titel + (o.raum ? " · " + o.raum : ""), o.notiz, "PT30M");
       else  termin(o.id, icsTag(o.datum), icsFolgetag(o.datum), true,
@@ -1957,7 +1957,7 @@ const alsZahl    = (v, min, max, standard) => {
 const alsDatum   = v => /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : "";
 const alsUhrzeit = v => /^([01]\d|2[0-3]):[0-5]\d$/.test(v) ? v : "";
 const alsKuerzel = v => alsText(v, 20).trim().toUpperCase();
-const alsId      = v => /^[A-Za-z0-9_-]{1,40}$/.test(String(v)) ? String(v) : neueId();
+const alsId      = v => /^[A-Za-z0-9_-]{1,40}$/.test(String(v)) ? String(v) : newId();
 /* Bilder dürfen nur eingebettete Bilddaten sein — ein beliebiger Text stünde
    sonst in einem src-Attribut und könnte daraus ausbrechen. */
 const alsBild = v => (typeof v === "string" && v.length < 4e6
@@ -2081,7 +2081,7 @@ function noteSaeubern(g){
 function paketSaeubern(d){
   const p = {};
   if(!d || typeof d !== "object") return p;
-  if(d.cfg  && typeof d.cfg  === "object") p.cfg  = cfgSaeubern(d.cfg);
+  if(d.config  && typeof d.config  === "object") p.config  = cfgSaeubern(d.config);
   if(d.plan && typeof d.plan === "object") p.plan = planSaeubern(d.plan);
   if(Array.isArray(d.eintraege)) p.eintraege = d.eintraege.slice(0,5000).map(eintragSaeubern).filter(Boolean);
   if(Array.isArray(d.ferien))    p.ferien    = d.ferien.slice(0,2000).map(freiSaeubern).filter(Boolean);
@@ -2154,7 +2154,7 @@ const sicherungInhalt = () => profile.length > 1 ? sicherungAlleText() : sicheru
    unangetastet — dort liegen womöglich fremde Dateien. */
 const SICHERUNGSNAME = /^stundenplan-.+-(\d{4}-\d{2}-\d{2})\.json$/;
 function haltegrenze(){
-  const monate = Math.max(0, Number(cfg.sicherHalten) || 0);
+  const monate = Math.max(0, Number(config.sicherHalten) || 0);
   if(!monate) return null;
   const d = new Date(); d.setMonth(d.getMonth() - monate);
   return iso(d);
@@ -2200,15 +2200,15 @@ async function jetztSichern(fragen){
         + (fertig.weg ? ` · ${zahl(fertig.weg,"alte Datei","alte Dateien")} entfernt` : ""));
       return true;
     }
-  }catch(e){ zeigeFehler("Ordner: " + ((e && e.message) || e)); return false; }
+  }catch(e){ showError("Ordner: " + ((e && e.message) || e)); return false; }
   herunterladen(sicherungInhalt(), sicherungDateiname(), "application/json");
   sicherungNotiert();
   return true;
 }
-/* Beim Öffnen von selbst sichern. Ohne erteilte Berechtigung wird nicht
+/* Beim Öffnen von selbst saveAll. Ohne erteilte Berechtigung wird nicht
    gefragt — dann übernimmt das Banner, wo ein Antippen die Frage erlaubt. */
 async function autoSicherung(){
-  if(!cfg.sicherAuto || !sicherungFaellig()) return;
+  if(!config.sicherAuto || !sicherungFaellig()) return;
   await ordnerLaden();
   try{
     const fertig = await inOrdnerSichern(false);
@@ -2234,7 +2234,7 @@ const HILFE = [
   <p class="hWarn"><b>Das Wichtigste:</b> Alle Daten liegen ausschließlich im Speicher
    deines Browsers. Es gibt keinen Server, kein Konto, keine Wiederherstellung.
    Löschst du die Websitedaten, ist alles weg — auch der Entwickler kann nichts
-   zurückholen. Deshalb: regelmäßig sichern (siehe <i>Sicherung</i>).</p>`},
+   zurückholen. Deshalb: regelmäßig saveAll (siehe <i>Sicherung</i>).</p>`},
 
 {id:"installieren", teil:"Erste Schritte", titel:"Auf den Startbildschirm legen", worte:"installieren pwa app icon homescreen",
  text:`<p>Die App läuft im Browser, lässt sich aber wie eine richtige App ablegen.
@@ -2275,15 +2275,15 @@ const HILFE = [
    der Unterricht am Ende der Tage. Die App fragt vorher nach und nennt die Zahl
    der betroffenen Stunden.</p>`},
 
-{id:"handeintragen", teil:"Der Stundenplan", titel:"Plan von Hand eintragen", worte:"bearbeiten stift fach raum lehrer",
+{id:"handeintragen", teil:"Der Stundenplan", titel:"Plan von Hand eintragen", worte:"editing stift fach raum lehrer",
  text:`<p><b>✎ oben antippen</b> schaltet das Bearbeiten ein — ein Hinweis unter dem
    Plan zeigt das an. Jetzt öffnet ein Tipp auf eine Stunde die Felder
    <i>Fach</i>, <i>Raum</i>, <i>Lehrkraft</i>.</p>
   <p>Fächer werden immer <b>groß</b> gespeichert, egal wie du sie tippst. Sonst
-   würden „Ch“ und „CH“ als zwei Fächer gelten und der Notenschnitt zerfiele.</p>
+   würden „Ch“ und „CH“ als pad2 Fächer gelten und der Notenschnitt zerfiele.</p>
   <p>Erneut auf ✎ tippen beendet das Bearbeiten. Für eine Woche brauchst du keine
    fünf Minuten — <b>ein Stundenplan wiederholt sich</b>, eine Woche reicht,
-   bei A/B-Wochen zwei.</p>`},
+   bei A/B-Wochen pad2.</p>`},
 
 {id:"import", teil:"Der Stundenplan", titel:"Plan aus dem Schulportal einfügen", worte:"import kopieren zwischenablage einfügen portal",
  text:`<p>⚙ → <b>Plan einfügen</b>. Tag und Woche wählen, die kopierte Tabelle in
@@ -2305,7 +2305,7 @@ MA, B006 (SCHM)</pre>
   <p>Passt das Format deiner Schule gar nicht: Der Ausdruck steht in
    <code>app.js</code> in der Funktion <code>parseZelle</code>.</p>`},
 
-{id:"abwoche", teil:"Der Stundenplan", titel:"A- und B-Wochen", worte:"wechselwoche gerade ungerade kalenderwoche",
+{id:"abwoche", teil:"Der Stundenplan", titel:"A- und B-Wochen", worte:"wechselwoche gerade ungerade calendarWeek",
  text:`<p>Feste Regel: <b>ungerade Kalenderwoche = A, gerade = B.</b> Welche gerade
    läuft, steht oben neben der Kalenderwoche und in den Einstellungen.</p>
   <p>Passt es bei deiner Schule andersherum, trag deine A-Woche einfach als
@@ -2323,7 +2323,7 @@ MA = Mathematik</pre>
   <p>Der Plan zeigt weiter die Kürzel — sonst passt er nicht auf den Bildschirm.
    Die vollen Namen erscheinen in der Fach-Info, im Zeugnis und in der Suche:
    Wer „Chemie“ sucht, findet auch Einträge, die nur „CH“ tragen.</p>`},
-{id:"reiter", teil:"Täglich benutzen", titel:"Die vier Reiter", worte:"navigation wischen ansicht tag kalender einträge zeugnis",
+{id:"reiter", teil:"Täglich benutzen", titel:"Die vier Reiter", worte:"navigation wischen view tag kalender einträge zeugnis",
  text:`<table class="hTab">
    <tr><th>Reiter</th><th>Inhalt</th></tr>
    <tr><td><b>Tag</b></td><td>Plan des Tages mit Uhrzeiten, laufender Stunde, Fortschrittsbalken</td></tr>
@@ -2440,7 +2440,7 @@ MA = Mathematik</pre>
    über alle Fächer, die Noten haben. Die Reihenfolge der Fächer ist unter ⚙
    umsortierbar.</p>
   <p class="hWarn"><b>Das ist eine Schätzung, keine Auskunft.</b> Die App gewichtet
-   alle Noten einer Art gleich. Lehrkräfte rechnen oft anders — eine Klausur zählt
+   alle Noten einer Art sameDate. Lehrkräfte rechnen oft anders — eine Klausur zählt
    selten so viel wie ein Test.</p>`},
 {id:"merkblatt", teil:"Merkblätter, Fehlzeiten, Ferien", titel:"Merkblätter", worte:"formeln vokabeln bilder foto tafelbild",
  text:`<p>Beliebig viele je Fach, jedes mit Datum und Uhrzeit. Zeilenumbrüche und
@@ -2472,7 +2472,7 @@ MA = Mathematik</pre>
    grau dargestellt wie Ferien und <b>überleben ein erneutes Laden</b> der
    offiziellen Termine.</p>`},
 
-{id:"warumsichern", teil:"Sicherung", titel:"Warum du sichern musst", worte:"datenverlust backup verloren",
+{id:"warumsichern", teil:"Sicherung", titel:"Warum du saveAll musst", worte:"datenverlust backup verloren",
  text:`<p class="hWarn">Deine Daten liegen nur auf diesem Gerät. Das heißt konkret:</p>
   <ul>
    <li>Löschst du in Chrome die <b>Cookies und Websitedaten</b>, ist der komplette
@@ -2488,9 +2488,9 @@ MA = Mathematik</pre>
 {id:"sichernwie", teil:"Sicherung", titel:"Sichern und wieder einlesen", worte:"datei json export import teilen",
  text:`<p>⚙ → <b>Sicherung</b>:</p>
   <ul>
-   <li><b>Als Datei sichern</b> — eine JSON-Datei dieses Profils in die Downloads.</li>
-   <li><b>Alle Profile sichern</b> — eine einzige Datei für das ganze Gerät.
-     Erscheint erst ab zwei Profilen.</li>
+   <li><b>Als Datei saveAll</b> — eine JSON-Datei dieses Profils in die Downloads.</li>
+   <li><b>Alle Profile saveAll</b> — eine einzige Datei für das ganze Gerät.
+     Erscheint erst ab pad2 Profilen.</li>
    <li><b>Teilen</b> — über das System-Teilen-Menü, etwa an dich selbst per Mail.
      Kann das Gerät keine Dateien teilen, landet die Sicherung in der
      Zwischenablage; ein abgebrochenes Teilen zählt nicht als Sicherung.</li>
@@ -2506,14 +2506,14 @@ MA = Mathematik</pre>
 {id:"ordner", teil:"Sicherung", titel:"Sicherungsordner und Automatik", worte:"automatisch ordner rhythmus erinnerung haltefrist",
  text:`<p><b>Am Rechner (Chrome, Edge):</b> ⚙ → <b>Sicherungsordner</b> → einmal einen
    Ordner wählen. Danach legt die App ihre Sicherungen immer dort ab, ohne zu
-   fragen. Mit dem Häkchen <i>Beim Öffnen automatisch sichern</i> passiert das von
+   fragen. Mit dem Häkchen <i>Beim Öffnen automatisch saveAll</i> passiert das von
    selbst, sobald es fällig ist.</p>
   <p><b>Haltefrist:</b> Im Ordner bleiben die letzten 1, 3, 6 oder 12 Monate.
    Ältere Sicherungen räumt die App weg — aber <b>nur ihre eigenen</b>, erkennbar
    am Namensmuster. Fremde Dateien im Ordner bleiben unangetastet.</p>
   <p><b>Rhythmus:</b> ⚙ → <i>Erinnerung</i> → alle 7, 14, 28 Tage, alle 3 Monate
    oder nie. Ist es fällig, erscheint oben in der Tagesansicht ein Banner mit
-   <i>Jetzt sichern</i> und <i>Heute nicht</i>.</p>
+   <i>Jetzt saveAll</i> und <i>Heute nicht</i>.</p>
   <p class="hHinweis"><b>Auf dem Handy gibt es die Ordnerwahl nicht</b> — kein
    mobiler Browser kann eine Seite dauerhaft in einen Ordner schreiben lassen.
    Sicherungen gehen dort in die Downloads. Willst du sie sortiert haben, schalte
@@ -2524,13 +2524,13 @@ MA = Mathematik</pre>
  text:`<p>Mehrere Datensätze auf einem Gerät. Jedes Profil hat eigenen Plan, eigene
    Einträge, Noten, Merkblätter und Einstellungen — <b>nichts wird geteilt</b>.</p>
   <p>Beim Öffnen steht die Auswahl am Anfang, auch bei nur einem Profil: So siehst
-   du immer, in welchen Datensatz du gleich schreibst. Unter ⚙ → <i>Beim Öffnen</i>
-   umstellbar auf <i>nur bei mehreren Profilen</i> oder <i>gleich in den Plan</i>.</p>
+   du immer, in welchen Datensatz du sameDate schreibst. Unter ⚙ → <i>Beim Öffnen</i>
+   umstellbar auf <i>nur bei mehreren Profilen</i> oder <i>sameDate in den Plan</i>.</p>
   <p>Jederzeit über den Buchstaben oben rechts erreichbar. Dort auch <i>Verwalten</i>
    zum Anlegen, Umbenennen und Löschen.</p>`},
 
 {id:"erinnerungen", teil:"Erinnerungen", titel:"Warum sich die App nicht selbst weckt", worte:"benachrichtigung push melden",
- text:`<p>Eine Web-App kann sich nicht selbst wecken. Es gibt deshalb zwei Wege:</p>
+ text:`<p>Eine Web-App kann sich nicht selbst wecken. Es gibt deshalb pad2 Wege:</p>
   <ol>
    <li><b>Beim Öffnen.</b> Die App meldet sich, wenn etwas ansteht — sonntags mit
      einem Wochenüberblick, am Tag vor einer Klausur, bei Klausuren in den nächsten
@@ -2553,7 +2553,7 @@ MA = Mathematik</pre>
   <p>Bei einem erneuten Import werden dieselben Termine aktualisiert statt
    verdoppelt — jeder trägt eine feste Kennung.</p>`},
 {id:"aufbau", teil:"Technik: wie es funktioniert", titel:"Aufbau — drei Dateien, kein Server", worte:"architektur html js quelltext",
- text:`<p>Die ganze App besteht aus drei Textdateien und zwei Bildern:</p>
+ text:`<p>Die ganze App besteht aus drei Textdateien und pad2 Bildern:</p>
   <table class="hTab">
    <tr><th>Datei</th><th>Inhalt</th></tr>
    <tr><td><code>index.html</code></td><td>Aufbau und sämtliches CSS, alle Dialoge</td></tr>
@@ -2572,7 +2572,7 @@ MA = Mathematik</pre>
    Satz Schlüssel mit dem Präfix <code>p&lt;id&gt;_</code>:</p>
   <table class="hTab">
    <tr><th>Schlüssel</th><th>Inhalt</th></tr>
-   <tr><td><code>cfg</code></td><td>Einstellungen, Stundenraster, Kürzel-Tabellen</td></tr>
+   <tr><td><code>config</code></td><td>Einstellungen, Stundenraster, Kürzel-Tabellen</td></tr>
    <tr><td><code>plan</code></td><td><code>plan[A|B][MO..FR][Feld]</code> = Fach, Raum, Lehrkraft</td></tr>
    <tr><td><code>eintraege</code></td><td>Hausaufgaben H, Klausuren K, Notizen N, Merkblätter M, Fehlzeiten F</td></tr>
    <tr><td><code>sonder</code></td><td>einmalige Ereignisse, Ausfall, Vertretung</td></tr>
@@ -2581,13 +2581,13 @@ MA = Mathematik</pre>
   </table>
   <p>Alles als JSON. Gelöschtes bekommt nur die Markierung
    <code>geloescht: true</code> und bleibt im Archiv, bis es endgültig entfernt wird.</p>
-  <p>In <code>cfg.fassung</code> steht der <b>Datenstand</b>. Trifft eine ältere App
+  <p>In <code>config.fassung</code> steht der <b>Datenstand</b>. Trifft eine ältere App
    auf neuere Daten, sagt sie das, statt sie stillschweigend zu beschneiden.</p>`},
 
 {id:"zeichnen", teil:"Technik: wie es funktioniert", titel:"Wie die Anzeige entsteht", worte:"rendern zeichne neu aufbauen",
  text:`<p>Es gibt kein Framework und keine Datenbindung. Nach jeder Änderung läuft
    eine Funktion <code>zeichne()</code>, die den sichtbaren Bereich komplett neu
-   aufbaut. Davor räumt <code>normalisiere()</code> die Daten auf: fehlende Felder
+   aufbaut. Davor räumt <code>normalize()</code> die Daten auf: fehlende Felder
    ergänzen, Fächer großschreiben, abgehakte Aufgaben nach sieben Tagen archivieren.</p>
   <p>Das ist absichtlich stumpf. Der gesamte Zustand steht in wenigen Variablen,
    und jede Ansicht ist eine reine Funktion davon — es gibt keinen Zwischenzustand,
@@ -2626,7 +2626,7 @@ MA = Mathematik</pre>
   <p>Es gibt keine Zugangsdaten, keine Schlüssel und keine Anmeldung — also auch
    nichts, was gestohlen werden könnte.</p>`},
 
-{id:"kalenderwoche", teil:"Technik: wie es funktioniert", titel:"Datum, Kalenderwoche, A/B", worte:"zeitzone iso woche berechnung",
+{id:"calendarWeek", teil:"Technik: wie es funktioniert", titel:"Datum, Kalenderwoche, A/B", worte:"zeitzone iso woche berechnung",
  text:`<p>Datumsangaben werden als <code>JJJJ-MM-TT</code> geführt und stets als
    <b>lokale Zeit</b> gelesen. Der naheliegende Weg über die eingebaute
    ISO-Umwandlung würde die Zeitzone verschieben und je nach Uhrzeit den Vortag
@@ -2642,7 +2642,7 @@ MA = Mathematik</pre>
    ein Vermittler-Dienst oder ein Skript auf der Portalseite — beides braucht
    Zugangsdaten oder die Zustimmung der Schule.</p>
   <p>Praktisch fällt es kaum ins Gewicht: Der Plan gilt ein halbes Jahr. Nur
-   Vertretungen musst du nachsehen, und die trägst du mit zwei Tipps ein.</p>
+   Vertretungen musst du nachsehen, und die trägst du mit pad2 Tipps ein.</p>
   <p><b>Warum rund 5 MB?</b> Das ist die übliche Grenze des Browserspeichers.
    Browser rechnen dabei in Zwei-Byte-Zeichen, weshalb die Anzeige unter
    ⚙ → Speicher ebenso rechnet. Bilder in Merkblättern sind mit Abstand der
@@ -2672,9 +2672,9 @@ MA = Mathematik</pre>
 {id:"problemdaten", teil:"Wenn etwas klemmt", titel:"Häufige Fälle", worte:"probleme hilfe funktioniert nicht leer",
  text:`<table class="hTab">
    <tr><th>Beobachtung</th><th>Ursache und Abhilfe</th></tr>
-   <tr><td>Plan ist leer</td><td>Anderes Profil aktiv? Buchstabe oben rechts prüfen.</td></tr>
+   <tr><td>Plan ist leer</td><td>Anderes Profil activeEntries? Buchstabe oben rechts prüfen.</td></tr>
    <tr><td>Alles weg</td><td>Websitedaten gelöscht oder Speicher vom System geräumt. Ohne Sicherung nicht wiederherstellbar.</td></tr>
-   <tr><td>„Speicher voll“</td><td>Bilder aus alten Merkblättern entfernen, vorher sichern.</td></tr>
+   <tr><td>„Speicher voll“</td><td>Bilder aus alten Merkblättern entfernen, vorher saveAll.</td></tr>
    <tr><td>Keine Erinnerungen</td><td>Berechtigung unter ⚙ prüfen. Auf dem iPhone nur, wenn die App auf dem Startbildschirm liegt. Verlässlich ist der Kalender-Export.</td></tr>
    <tr><td>Neue Fassung kommt nicht</td><td>⚙ → <i>Nach Update suchen</i>, sonst App schließen und neu öffnen.</td></tr>
    <tr><td>Ferien laden schlägt fehl</td><td>Internet prüfen. Antwortet der Dienst nicht, bricht die App nach 15 Sekunden ab und sagt es.</td></tr>
@@ -2795,7 +2795,7 @@ function reiheZeichnen(sel, liste, beschriften){
 let reiheEinListe = [], reiheFachListe = [];
 function reihenZeichnen(){
   reiheZeichnen("#sReiheEin", reiheEinListe, k => ARTLANG[k] || k);
-  reiheZeichnen("#sReiheFach", reiheFachListe, fachName);
+  reiheZeichnen("#sReiheFach", reiheFachListe, subjectName);
 }
 function reiheSchieben(liste, i, r){
   const j = i + r;
@@ -2819,11 +2819,11 @@ $("#sReiheFach").onclick = e => {
 };
 
 function anteilFaecherZeichnen(){
-  const liste = alleFaecher();
+  const liste = allSubjects();
   $("#sAnteilFaecher").innerHTML = liste.length
-    ? liste.map(f => `<div class="anteilzeile"><span>${esc(fachName(f))}</span>
+    ? liste.map(f => `<div class="anteilzeile"><span>${esc(subjectName(f))}</span>
         <input type="number" min="0" max="100" step="5" data-anteilfach="${esc(f)}"
-          placeholder="${Number(cfg.anteilM)||0}" value="${hatEigenenAnteil(f) ? cfg.anteile[f] : ""}"></div>`).join("")
+          placeholder="${Number(config.anteilM)||0}" value="${hatEigenenAnteil(f) ? config.anteile[f] : ""}"></div>`).join("")
     : `<p class="hinweis">Sobald Fächer im Plan stehen, erscheinen sie hier.</p>`;
 }
 function anteilFaecherLesen(){
@@ -2842,7 +2842,7 @@ sAnteilM.oninput = anteilHinweis;
 sNotenSystem.onchange = () => {
   $("#eWertLabel").textContent = sNotenSystem.value === "punkte15" ? "Punkte 0–15" : "Note 1–6";
 };
-/* Browser rechnen den Speicher in UTF-16-Einheiten ab: zwei Byte je Zeichen.
+/* Browser rechnen den Speicher in UTF-16-Einheiten ab: pad2 Byte je Zeichen.
    Wer nur Zeichen zählt, meldet die Hälfte und wundert sich, warum bei
    „2500 kB" nichts mehr hineinpasst. Schlüsselnamen zählen mit. */
 const GRENZE_KB = 5120;
@@ -2872,7 +2872,7 @@ function sicherungStand(){
   if(!l){ el.textContent = "Noch nie gesichert. Jetzt wäre ein guter Zeitpunkt."; return; }
   el.textContent = sicherungFaellig()
     ? `Letzte Sicherung vor ${zahl(alter,"Tag","Tagen")} — Zeit für eine neue.`
-    : `Letzte Sicherung: ${zeigDatum(l)}${alter ? ` (vor ${zahl(alter,"Tag","Tagen")})` : " (heute)"}.`;
+    : `Letzte Sicherung: ${formatDate(l)}${alter ? ` (vor ${zahl(alter,"Tag","Tagen")})` : " (heute)"}.`;
 }
 function archivHinweisEinstellung(){
   const tage = Math.max(0, Number(sArchivTage.value) || 0);
@@ -2935,7 +2935,7 @@ $("#sOrdnerWahl").onclick = async () => {
     ordner = gewaehlterOrdner;
     await griffLegen(ordner);
     ordnerStand();
-  }catch(e){ if(e && e.name !== "AbortError") zeigeFehler("Ordner: " + ((e && e.message) || e)); }
+  }catch(e){ if(e && e.name !== "AbortError") showError("Ordner: " + ((e && e.message) || e)); }
 };
 $("#sOrdnerWeg").onclick = async () => {
   ordner = null;
@@ -2948,43 +2948,43 @@ $("#sOrdnerJetzt").onclick = async () => {
   ordnerStand();
 };
 function einstellungenOeffnen(){
-  sKlasse.value = cfg.klasse;
-  sZweiWochen.checked = cfg.zweiWochen;
-  slotEditorZeichnen(cfg.slots);
-  sFarbe.value = cfg.akzent; sFarbeHex.value = cfg.akzent;
-  sModus.value = cfg.modus; sSchrift.value = cfg.schrift;
-  sStartProfil.value = cfg.startProfil || "immer";
+  sKlasse.value = config.klasse;
+  sZweiWochen.checked = config.zweiWochen;
+  slotEditorZeichnen(config.slots);
+  sFarbe.value = config.akzent; sFarbeHex.value = config.akzent;
+  sModus.value = config.modus; sSchrift.value = config.schrift;
+  sStartProfil.value = config.startProfil || "immer";
   if(sStartProfil.selectedIndex < 0) sStartProfil.value = "immer";
   $("#sFarbVorlagen").innerHTML = FARBEN.map(f =>
     `<button type="button" data-farbe="${f}" style="border-color:${f};color:${f}">${f}</button>`).join("");
-  sNotenSystem.value = cfg.notenSystem; sAnteilM.value = Number(cfg.anteilM)||0;
+  sNotenSystem.value = config.notenSystem; sAnteilM.value = Number(config.anteilM)||0;
   anteilHinweis(); anteilFaecherZeichnen();
-  sStdProTag.value = Math.max(1, Number(cfg.stdProTag) || 8);
-  sArchivTage.value = String(archivFrist());
+  sStdProTag.value = Math.max(1, Number(config.stdProTag) || 8);
+  sArchivTage.value = String(archiveRetention());
   if(sArchivTage.selectedIndex < 0) sArchivTage.value = "0";
   archivHinweisEinstellung();
   reiheEinListe = reiheEin().slice();
   reiheFachListe = fachReihenfolge().slice();
   reihenZeichnen();
-  sMelden.checked = !!cfg.melden; meldeStand();
-  sLehrer.value = paareText(cfg.lehrer); sFaecher.value = paareText(cfg.fachnamen);
+  sMelden.checked = !!config.melden; meldeStand();
+  sLehrer.value = paareText(config.lehrer); sFaecher.value = paareText(config.fachnamen);
   sLand.innerHTML = `<option value="">— wählen —</option>` +
-    Object.entries(LAENDER).map(([k,v]) => `<option value="${k}" ${cfg.land === k ? "selected":""}>${v}</option>`).join("");
+    Object.entries(LAENDER).map(([k,v]) => `<option value="${k}" ${config.land === k ? "selected":""}>${v}</option>`).join("");
   ferienStand();
   /* Ein Wert, den die Auswahl nicht kennt, lässt selectedIndex auf -1 fallen. */
-  sRhythmus.value = String(Math.max(0, Number(cfg.sicherTage) || 0));
+  sRhythmus.value = String(Math.max(0, Number(config.sicherTage) || 0));
   if(sRhythmus.selectedIndex < 0) sRhythmus.value = "28";
-  sHalten.value = String(Math.max(0, Number(cfg.sicherHalten) || 0));
+  sHalten.value = String(Math.max(0, Number(config.sicherHalten) || 0));
   if(sHalten.selectedIndex < 0) sHalten.value = "3";
-  sAuto.checked = !!cfg.sicherAuto;
+  sAuto.checked = !!config.sicherAuto;
   rhythmusHinweis();
   $("#sOrdnerGeht").classList.toggle("hidden", !ordnerMoeglich());
   $("#sOrdnerGehtNicht").classList.toggle("hidden", ordnerMoeglich());
   if(ordnerMoeglich()) ordnerLaden().then(ordnerStand);
   sDaten.value = sicherungsText();
-  $("#ankerJetzt").textContent = `Diese Woche ist KW ${kalenderwoche(new Date())}, also ${kalenderwoche(new Date())%2===1?"A":"B"}.`;
-  $("#ankerWrap").classList.toggle("hidden", !cfg.zweiWochen);
-  $("#sWocheKopieren").classList.toggle("hidden", !cfg.zweiWochen);
+  $("#ankerJetzt").textContent = `Diese Woche ist KW ${calendarWeek(new Date())}, also ${calendarWeek(new Date())%2===1?"A":"B"}.`;
+  $("#ankerWrap").classList.toggle("hidden", !config.zweiWochen);
+  $("#sWocheKopieren").classList.toggle("hidden", !config.zweiWochen);
   $("#sWocheStand").textContent = "";
   $("#sDateiAlle").classList.toggle("hidden", profile.length < 2);
   sicherungStand(); speicherStand(); versionPruefen();
@@ -2996,7 +2996,7 @@ sZweiWochen.onchange = () => {
   $("#sWocheKopieren").classList.toggle("hidden", !sZweiWochen.checked);
 };
 $("#sImport").onclick = () => { zurueckZuEinst = true; dlgEinst.close(); importOeffnen(); };
-/* A- und B-Woche unterscheiden sich meist nur in ein, zwei Stunden.
+/* A- und B-Woche unterscheiden sich meist nur in ein, pad2 Stunden.
    Einmal kopieren spart, den ganzen Plan zweimal einzutragen. */
 $("#sWocheKopieren").onclick = e => {
   const b = e.target.closest("[data-kopiere]"); if(!b) return;
@@ -3004,7 +3004,7 @@ $("#sWocheKopieren").onclick = e => {
   if(!confirm(`Die ${nach}-Woche wird vollständig durch die ${von}-Woche ersetzt. Fortfahren?`)) return;
   TAGE.forEach(t => plan[nach][t] = ((plan[von] && plan[von][t]) || [])
     .map(x => x ? Object.assign({}, x) : null));
-  sichern(); zeichne();
+  saveAll(); zeichne();
   $("#sWocheStand").textContent = `${von}-Woche in die ${nach}-Woche übernommen.`;
 };
 $("#slotEditor").onclick = e => {
@@ -3026,14 +3026,14 @@ function farbeVorschau(){
 }
 sFarbe.oninput = () => { sFarbeHex.value = sFarbe.value; farbeVorschau(); };
 sFarbeHex.oninput = () => { if(/^#[0-9a-fA-F]{6}$/.test(sFarbeHex.value.trim())) sFarbe.value = sFarbeHex.value.trim(); farbeVorschau(); };
-sModus.onchange = () => { cfg.modus = sModus.value; themaAnwenden(); };
-sSchrift.onchange = () => { cfg.schrift = sSchrift.value; themaAnwenden(); };
+sModus.onchange = () => { config.modus = sModus.value; themaAnwenden(); };
+sSchrift.onchange = () => { config.schrift = sSchrift.value; themaAnwenden(); };
 
-const dateiName = () => (profilName().replace(/[^A-Za-z0-9äöüÄÖÜß -]/g,"").trim() || "plan")
+const dateiName = () => (profileName().replace(/[^A-Za-z0-9äöüÄÖÜß -]/g,"").trim() || "plan")
   .replace(/\s+/g,"-").toLowerCase();
 const sicherungsText = () => JSON.stringify(
-  {fassung:2, art:"profil", erstellt:new Date().toISOString(), profil:profilName(),
-   cfg, plan, eintraege, ferien, sonder, noten}, null, 2);
+  {fassung:2, art:"profile", erstellt:new Date().toISOString(), profile:profileName(),
+   config, plan, eintraege, ferien, sonder, noten}, null, 2);
 /* Die Sicherung eines Profils enthält nur dieses eine. Wer mehrere führt,
    hätte auf einem neuen Gerät sonst jedes einzeln nachbauen müssen. */
 function sicherungAlleText(){
@@ -3042,9 +3042,9 @@ function sicherungAlleText(){
     catch(e){ return null; }
   };
   return JSON.stringify({fassung:2, art:"alle", erstellt:new Date().toISOString(),
-    profile: profile.map(p => p.id === profilId
-      ? {id:p.id, name:p.name, cfg, plan, eintraege, ferien, sonder, noten}
-      : {id:p.id, name:p.name, cfg:holen(p.id,"cfg"), plan:holen(p.id,"plan"),
+    profile: profile.map(p => p.id === profileId
+      ? {id:p.id, name:p.name, config, plan, eintraege, ferien, sonder, noten}
+      : {id:p.id, name:p.name, config:holen(p.id,"config"), plan:holen(p.id,"plan"),
          eintraege:holen(p.id,"eintraege"), ferien:holen(p.id,"ferien"),
          sonder:holen(p.id,"sonder"), noten:holen(p.id,"noten")})}, null, 2);
 }
@@ -3052,10 +3052,10 @@ function sicherungAlleText(){
    falscher Vermerk verschweigt vier Wochen lang, dass keine Sicherung besteht. */
 function sicherungNotiert(){
   const heute = iso(new Date());
-  cfg.letzteSicherung = heute;
+  config.letzteSicherung = heute;
   try{ localStorage.setItem("sicherungZuletzt", heute); }catch(e){}
   Speicher.entferne("sicherSpaeter");      // erledigt ist nicht vertagt
-  sichern(); sicherungStand(); zeichne();
+  saveAll(); sicherungStand(); zeichne();
 }
 $("#sDatei").onclick = () => {
   herunterladen(sicherungsText(), `stundenplan-${dateiName()}-${iso(new Date())}.json`, "application/json");
@@ -3092,7 +3092,7 @@ $("#sTeilen").onclick = async () => {
     sicherungNotiert();
   }catch(e){
     if(e && e.name === "AbortError") return;      // abgebrochen ist keine Sicherung
-    zeigeFehler("Teilen fehlgeschlagen: " + ((e && e.message) || e));
+    showError("Teilen fehlgeschlagen: " + ((e && e.message) || e));
   }
 };
 /* Ersetzt sämtliche Profile des Geräts durch die aus der Datei. */
@@ -3106,7 +3106,7 @@ function alleProfileUebernehmen(liste){
     const rein = paketSaeubern(p);
     DATEN.filter(k => k !== "merkblatt").forEach(k => {
       const wert = rein[k] !== undefined ? rein[k]
-                 : (k === "cfg" || k === "plan") ? {} : [];
+                 : (k === "config" || k === "plan") ? {} : [];
       try{ localStorage.setItem("p"+id+"_"+k, JSON.stringify(wert)); }catch(e){}
     });
     neu.push({id, name: alsText(p && p.name, 40).trim() || "Profil " + (i+1)});
@@ -3115,10 +3115,10 @@ function alleProfileUebernehmen(liste){
   /* Was vorher da war und in der Sicherung nicht vorkommt, wäre sonst
      unerreichbarer Ballast im Speicher. */
   vorher.filter(id => !neu.some(x => x.id === id))
-    .forEach(id => profilSchluessel(id).forEach(k => { try{ localStorage.removeItem(k); }catch(e){} }));
-  profile = neu; profilId = neu[0].id; profileSichern();
-  zustandLaden(); normalisiere(); sichern(); profilKnopf();
-  ansicht = "tag"; einSub = null; dlgEinst.close(); zeichne();
+    .forEach(id => profileKeys(id).forEach(k => { try{ localStorage.removeItem(k); }catch(e){} }));
+  profile = neu; profileId = neu[0].id; saveProfiles();
+  loadState(); normalize(); saveAll(); profilKnopf();
+  view = "tag"; entrySub = null; dlgEinst.close(); zeichne();
 }
 $("#sLaden").onclick = () => {
   let d;
@@ -3137,22 +3137,22 @@ $("#sLaden").onclick = () => {
                         : `Letzte Sicherung der jetzigen Daten: vor ${zahl(alter,"Tag","Tagen")}.`)
       + "\n\nFortfahren?")) return;
   }
-  if(teil.cfg)       cfg       = teil.cfg;
+  if(teil.config)       config       = teil.config;
   if(teil.plan)      plan      = teil.plan;
   if(teil.eintraege) eintraege = teil.eintraege;
   if(teil.ferien)    ferien    = teil.ferien;
   if(teil.sonder)    sonder    = teil.sonder;
   if(teil.noten)     noten     = teil.noten;
-  normalisiere(); sichern(); dlgEinst.close(); zeichne();
+  normalize(); saveAll(); dlgEinst.close(); zeichne();
 };
 $("#sReset").onclick = () => {
   if(!confirm("Plan, Einträge, Noten, Merkblätter und Archiv dieses Profils löschen?")) return;
   /* Auch die Nebenschlüssel — sonst bleibt etwa der Merker „heute schon
      erinnert" stehen und das frische Profil schweigt. */
-  profilSchluessel(profilId).forEach(k => { try{ localStorage.removeItem(k); }catch(e){} });
+  profileKeys(profileId).forEach(k => { try{ localStorage.removeItem(k); }catch(e){} });
   Speicher.puffer = {};
-  cfg = Object.assign({}, STANDARD); plan = {}; eintraege = []; ferien = []; sonder = []; noten = [];
-  normalisiere(); sichern(); dlgEinst.close(); zeichne();
+  config = Object.assign({}, STANDARD); plan = {}; eintraege = []; ferien = []; sonder = []; noten = [];
+  normalize(); saveAll(); dlgEinst.close(); zeichne();
 };
 $("#sUpdate").onclick = async () => {
   const s = await versionPruefen();
@@ -3161,9 +3161,9 @@ $("#sUpdate").onclick = async () => {
 };
 $("#bEinstSpeichern").onclick = () => {
   const neu = slotsAuslesen();
-  /* normalisiere() kürzt den Plan hart auf die Zahl der Zeilen. Das ist
+  /* normalize() kürzt den Plan hart auf die Zahl der Zeilen. Das ist
      richtig — aber nicht kommentarlos, wenn dort noch Unterricht steht. */
-  if(neu.length && neu.length < cfg.slots.length){
+  if(neu.length && neu.length < config.slots.length){
     let verlust = 0;
     ["A","B"].forEach(w => TAGE.forEach(t =>
       ((plan[w] && plan[w][t]) || []).slice(neu.length).forEach(x => { if(x) verlust++; })));
@@ -3171,27 +3171,27 @@ $("#bEinstSpeichern").onclick = () => {
       + `${zahl(verlust,"belegte Stunde","belegte Stunden")} am Ende der Tage verloren. `
       + `Trotzdem speichern?`)) return;
   }
-  cfg.klasse = sKlasse.value.trim();
-  cfg.zweiWochen = sZweiWochen.checked;
-  if(neu.length) cfg.slots = neu;
-  cfg.land = sLand.value;
-  cfg.notenSystem = sNotenSystem.value;
-  cfg.anteilM = Math.max(0, Math.min(100, Number(sAnteilM.value)||0));
-  cfg.anteile = anteilFaecherLesen();
-  cfg.lehrer = textPaare(sLehrer.value);
-  cfg.fachnamen = textPaare(sFaecher.value);
-  if(/^#[0-9a-fA-F]{6}$/.test(sFarbeHex.value.trim())) cfg.akzent = sFarbeHex.value.trim();
-  cfg.modus = sModus.value; cfg.schrift = sSchrift.value;
-  cfg.startProfil = sStartProfil.value;
-  cfg.melden = sMelden.checked;
-  cfg.stdProTag = Math.max(1, Math.min(16, Number(sStdProTag.value) || 8));
-  cfg.archivTage = Math.max(0, Math.min(3650, Number(sArchivTage.value) || 0));
-  cfg.sicherTage = Math.max(0, Math.min(365, Number(sRhythmus.value) || 0));
-  cfg.sicherHalten = Math.max(0, Math.min(60, Number(sHalten.value) || 0));
-  cfg.sicherAuto = sAuto.checked;
-  cfg.reiheEin = reiheEinListe.slice();
-  cfg.reiheFach = reiheFachListe.slice();
-  normalisiere(); sichern(); dlgEinst.close(); zeichne();
+  config.klasse = sKlasse.value.trim();
+  config.zweiWochen = sZweiWochen.checked;
+  if(neu.length) config.slots = neu;
+  config.land = sLand.value;
+  config.notenSystem = sNotenSystem.value;
+  config.anteilM = Math.max(0, Math.min(100, Number(sAnteilM.value)||0));
+  config.anteile = anteilFaecherLesen();
+  config.lehrer = textPaare(sLehrer.value);
+  config.fachnamen = textPaare(sFaecher.value);
+  if(/^#[0-9a-fA-F]{6}$/.test(sFarbeHex.value.trim())) config.akzent = sFarbeHex.value.trim();
+  config.modus = sModus.value; config.schrift = sSchrift.value;
+  config.startProfil = sStartProfil.value;
+  config.melden = sMelden.checked;
+  config.stdProTag = Math.max(1, Math.min(16, Number(sStdProTag.value) || 8));
+  config.archivTage = Math.max(0, Math.min(3650, Number(sArchivTage.value) || 0));
+  config.sicherTage = Math.max(0, Math.min(365, Number(sRhythmus.value) || 0));
+  config.sicherHalten = Math.max(0, Math.min(60, Number(sHalten.value) || 0));
+  config.sicherAuto = sAuto.checked;
+  config.reiheEin = reiheEinListe.slice();
+  config.reiheFach = reiheFachListe.slice();
+  normalize(); saveAll(); dlgEinst.close(); zeichne();
 };
 
 /* =====================================================================
@@ -3247,27 +3247,27 @@ async function aktualisieren(){
 function startAnsicht(){
   try{
     const p = new URLSearchParams(location.search);
-    const a = p.get("ansicht");
-    if(a && ANSICHTEN.includes(a)) ansicht = a;
+    const a = p.get("view");
+    if(a && ANSICHTEN.includes(a)) view = a;
     const s = p.get("sub");
-    if(s && ARTLANG[s]){ ansicht = "eintraege"; einSub = s; }
+    if(s && ARTLANG[s]){ view = "eintraege"; entrySub = s; }
   }catch(e){}
 }
 let letzterTag = iso(new Date());
 setInterval(() => {
   const jetzt = iso(new Date());
-  if(jetzt !== letzterTag){ letzterTag = jetzt; gewaehlt = new Date(); zeichne(); }
-  else if(ansicht === "tag") { zeichneFortschritt(); $("#countdown").textContent = countdownText(); }
+  if(jetzt !== letzterTag){ letzterTag = jetzt; selectedDate = new Date(); zeichne(); }
+  else if(view === "tag") { zeichneFortschritt(); $("#countdown").textContent = countdownText(); }
 }, 30000);
 document.addEventListener("visibilitychange", () => { if(!document.hidden) zeichne(); });
 /* Zwei offene Tabs auf demselben Profil schrieben sich bisher gegenseitig
    ganze Listen tot. Ändert der andere Tab etwas, hier neu einlesen. */
 window.addEventListener("storage", e => {
   if(!e.key) return;
-  if(e.key === "profile" || e.key === "profilAktiv"){ location.reload(); return; }
-  const vorne = "p" + profilId + "_";
+  if(e.key === "profile" || e.key === "activeProfile"){ location.reload(); return; }
+  const vorne = "p" + profileId + "_";
   if(!e.key.startsWith(vorne) || !DATEN.includes(e.key.slice(vorne.length))) return;
-  zustandLaden(); normalisiere(); zeichne();
+  loadState(); normalize(); zeichne();
 });
 
 /* Ohne <dialog> läuft hier fast nichts: jeder Eintrag, jede Einstellung
@@ -3278,21 +3278,21 @@ function browserPruefen(){
   if(!window.HTMLDialogElement || !HTMLDialogElement.prototype.showModal) fehlt.push("Dialogfenster");
   try{ if(!window.localStorage) fehlt.push("Speicher"); }catch(e){ fehlt.push("Speicher"); }
   if(!fehlt.length) return true;
-  zeigeFehler("Dieser Browser ist zu alt für die App — es fehlt: " + fehlt.join(", ")
+  showError("Dieser Browser ist zu alt für die App — es fehlt: " + fehlt.join(", ")
     + ".\nAuf dem iPhone braucht es iOS 15.4 oder neuer, sonst einen aktuellen "
     + "Chrome, Firefox, Edge oder Safari.");
   return false;
 }
 
 function starten(){
-  if(!cfg || !Array.isArray(cfg.slots) || !cfg.slots.length){
-    cfg = Object.assign({}, STANDARD, cfg || {});
-    cfg.slots = STANDARD.slots.slice();
+  if(!config || !Array.isArray(config.slots) || !config.slots.length){
+    config = Object.assign({}, STANDARD, config || {});
+    config.slots = STANDARD.slots.slice();
   }
   browserPruefen();
   themaAnwenden();
   startAnsicht();
-  normalisiere();
+  normalize();
   profilKnopf();
   zeichne();
   versionPruefen();
@@ -3300,10 +3300,10 @@ function starten(){
   erinnerungenPruefen().catch(() => {});
   autoSicherung().catch(() => {});
   /* Die Profilauswahl steht am Anfang, nicht nur bei mehreren Profilen:
-     wer sie sieht, weiß, in welchem Datensatz er gleich schreibt. */
-  const wann = cfg.startProfil || "immer";
+     wer sie sieht, weiß, in welchem Datensatz er sameDate schreibt. */
+  const wann = config.startProfil || "immer";
   if(wann === "immer" || (wann === "mehrere" && profile.length > 1)) profilAuswahlZeigen(false);
 }
 try{ starten(); }
-catch(e){ zeigeFehler(e.message, (e.stack||"").split("\n")[1] || ""); }
+catch(e){ showError(e.message, (e.stack||"").split("\n")[1] || ""); }
 if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
