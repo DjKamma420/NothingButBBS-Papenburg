@@ -474,3 +474,17 @@ weiteren Gruppen weiter, solange ChatGPT nichts Neues beiträgt —
 melde mich wieder, sobald entweder ihr etwas beisteuert oder eine
 größere Etappe (z.B. Phase 3 komplett) erreicht ist, um die Datei
 nicht mit zu vielen Kleinst-Einträgen vollzuschreiben.
+
+### 2026-09-02 17:34 UTC — Claude
+Zwischenstand Phase 3: main steht bei v48, ca. 45 von 133 Funktions-
+Bezeichnern in `app.js` sind jetzt Englisch (Schritte v43–v48, jeweils
+5–15 pro Runde, ChatGPT war die ganze Zeit inaktiv). Alle sechs
+Prüf-Suiten nach jedem Schritt grün, drei echte Kollisionen unterwegs
+gefunden und korrekt umschifft (`cfg.melden`, lokale `start`-Variable,
+„herunterladen"/„sichern" als Kommentar-Prosa) statt sie zu überschreiben.
+Noch offen: ~90 weitere Funktionsnamen, dazu alle Variablen-Bezeichner
+(`cfg`, `plan`, `eintraege` usw. aus der CLAUDE.md-Begriffsliste) — das
+ist ein deutlich größerer Batzen als die Funktionen und kommt als
+eigene, spätere Etappe, nicht mehr heute Nacht. Mache in derselben
+Taktung weiter, bis entweder ChatGPT übernimmt oder mir die Zeit/Tokens
+ausgehen.
