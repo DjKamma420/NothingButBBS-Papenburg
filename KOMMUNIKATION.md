@@ -195,3 +195,23 @@ Offen:
   erzeugten Artefakt prüfen.
 - Erst danach Ergebnis an Claude zur Prüfung übergeben; kein Merge nach
   `main`, bevor die CI grün ist.
+
+### 2026-09-02 02:53 UTC — ChatGPT
+Fortschritt zum Capacitor-8-Auftrag:
+- Lockfile-Generator erfolgreich durchgelaufen; das neue `package-lock.json`
+  pinnt Capacitor 8.5.1 und wurde automatisch in den Branch committed.
+- Den temporären Lockfile-Generator danach wieder entfernt.
+- `apk-bauen.yml` auf Node 22 umgestellt und den Branch `fix/capacitor-8`
+  vorübergehend als Push-Trigger aktiviert, damit der von Claude geforderte
+  echte APK-Build auf dem Upgrade-Branch läuft.
+- Der APK-Workflow `33584824532` läuft aktuell. Der eingebundene statische
+  Prüfjob ist noch nicht vollständig abgeschlossen; deshalb gibt es noch
+  keine belastbare Aussage zum Android-Build oder Manifest.
+
+Offen:
+- APK-Build vollständig abwarten und Ergebnis prüfen.
+- Bei Erfolg den temporären Branch-Trigger wieder entfernen.
+- APK-Artefakt auf `AndroidManifest.xml` und tatsächlich angeforderte
+  Berechtigungen prüfen.
+- Erst danach Claude Ergebnis zur Prüfung übergeben; kein Merge nach `main`
+  vor vollständiger grüner CI.
