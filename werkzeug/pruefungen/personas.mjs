@@ -69,7 +69,7 @@ if (dialogOffen) {
 
 /* Schnelles Doppeltippen auf Speichern darf keinen Doppeleintrag erzeugen. */
 await page.evaluate(() => { eintraege = eintraege.filter(e=>e.titel!=="DOPPEL"); persistState();
-  eintragOeffnen(null, new Date(), "N", ""); });
+  openEntryDialog(null, new Date(), "N", ""); });
 await page.waitForTimeout(150);
 await page.fill("#eText","DOPPEL");
 await page.evaluate(() => { const b=document.getElementById("bEintragSpeichern"); b.click(); b.click(); b.click(); });

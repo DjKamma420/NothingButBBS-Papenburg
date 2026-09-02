@@ -195,10 +195,10 @@ function loadState(){
   ferien    = Speicher.lies("ferien", []);
   sonder    = Speicher.lies("sonder", []);
   noten     = Speicher.lies("noten", []);
-  merkblattUmziehen();
+  migrateHandouts();
   migrateData();
 }
-/* Bis Fassung 3 erledigen normalize() und merkblattUmziehen() die
+/* Bis Fassung 3 erledigen normalize() und migrateHandouts() die
    Umstellung alter Formen von selbst; hier wird nur festgehalten, worauf
    spätere Schritte aufsetzen. Wichtig ist der umgekehrte Fall: Daten aus
    einer neueren App-Fassung dürfen nicht stillschweigend beschnitten werden. */
@@ -216,7 +216,7 @@ function migrateData(){
 }
 /* Frühere Fassungen hielten Merkblätter als {FACH: Text}. Jetzt sind es
    normale Einträge vom Typ M — dadurch gelten Suche und Archiv auch dort. */
-function merkblattUmziehen(){
+function migrateHandouts(){
   const alt = Speicher.lies("merkblatt", null);
   if(alt && typeof alt === "object" && !Array.isArray(alt)){
     Object.entries(alt).forEach(([fach, text]) => {
@@ -918,13 +918,13 @@ function renderAbsences(){
 }
 
 /** Fächer in der eingestellten Reihenfolge, neue hinten angehängt. */
-function fachReihenfolge(){
+function subjectOrder(){
   const alle = alleFaecher().filter(f => subjects().includes(f) || notenAktiv().some(n => n.fach === f));
   const wunsch = Array.isArray(cfg.reiheFach) ? cfg.reiheFach : [];
   return [...wunsch.filter(f => alle.includes(f)), ...alle.filter(f => !wunsch.includes(f))];
 }
 function renderReportCard(){
-  const liste = fachReihenfolge();
+  const liste = subjectOrder();
   const schnitte = liste.map(f => gradeAverage(f).gesamt).filter(w => w !== null);
   const gesamt = schnitte.length ? schnitte.reduce((a,b) => a+b, 0)/schnitte.length : null;
   $("#zeuSchnitt").textContent = gesamt === null ? "" : notenText(gesamt);
@@ -1066,7 +1066,7 @@ function openCalendarMenu(datum){
 }
 const kalMenu = (typ, extra) => {
   dlgKalTag.close();
-  eintragOeffnen(null, new Date(kalMenuDatum + "T12:00"), typ, "", undefined, extra);
+  openEntryDialog(null, new Date(kalMenuDatum + "T12:00"), typ, "", undefined, extra);
 };
 $("#bKmTermin").onclick  = () => kalMenu("E");
 $("#bKmHA").onclick      = () => kalMenu("H");
@@ -1133,15 +1133,15 @@ let offenerBlock = 0, langDruck = false, fachInfoFach = null;
 
 $("#plan").onclick = e => {
   const plus = e.target.closest("[data-weplus]");
-  if(plus){ eintragOeffnen(null, new Date(plus.dataset.weplus+"T12:00"), "E", "", null); return; }
+  if(plus){ openEntryDialog(null, new Date(plus.dataset.weplus+"T12:00"), "E", "", null); return; }
   const wes = e.target.closest("[data-wesonder]");
-  if(wes){ ereignisOeffnen(wes.dataset.wesonder); return; }
+  if(wes){ openEventDialog(wes.dataset.wesonder); return; }
   const b = e.target.closest("[data-block]"); if(!b) return;
   if(langDruck){ langDruck = false; return; }
   offenerBlock = +b.dataset.block;
   if(bearbeiten){ blockDialog(); return; }
   const o = sonderAn(gewaehlt, offenerBlock);
-  if(o){ ereignisOeffnen(o.id); return; }
+  if(o){ openEventDialog(o.id); return; }
   schnellDialog();
 };
 
@@ -1175,7 +1175,7 @@ const schnellFach = () => {
 };
 function schnellDialog(){
   const fach = schnellFach();
-  if(!fach){ eintragOeffnen(null, gewaehlt, "E", "", offenerBlock); return; }
+  if(!fach){ openEntryDialog(null, gewaehlt, "E", "", offenerBlock); return; }
   const s = cfg.slots[offenerBlock];
   $("#schnellTitel").textContent = fachName(fach);
   $("#schnellZeit").textContent = `${s.von} – ${s.bis}`;
@@ -1186,7 +1186,7 @@ function schnellDialog(){
   dlgSchnell.showModal();
 }
 const schnell = (typ, datum, extra) => { dlgSchnell.close();
-  eintragOeffnen(null, datum, typ, schnellFach(), offenerBlock, extra); };
+  openEntryDialog(null, datum, typ, schnellFach(), offenerBlock, extra); };
 $("#bSchnellHA").onclick = () => {
   const fach = schnellFach();
   schnell("H", nextDayWithSubject(gewaehlt, fach.toUpperCase()) || plusTage(gewaehlt,1));
@@ -1196,7 +1196,7 @@ $("#bSchnellKlausur").onclick = () => schnell("K", gewaehlt);
 $("#bSchnellFehl").onclick = () => {
   const std = (cfg.slots[offenerBlock].std || "1").split(",").length;
   dlgSchnell.close();
-  eintragOeffnen(null, gewaehlt, "F", "", offenerBlock, {stunden:std});
+  openEntryDialog(null, gewaehlt, "F", "", offenerBlock, {stunden:std});
 };
 $("#bSchnellAusfall").onclick = () => {
   dlgSchnell.close();
@@ -1207,10 +1207,10 @@ $("#bSchnellAusfall").onclick = () => {
   persistState(); render();
 };
 $("#bSchnellVertretung").onclick = () => {
-  dlgSchnell.close(); eintragOeffnen(null, gewaehlt, "E", "", offenerBlock, {art:"vertretung"});
+  dlgSchnell.close(); openEntryDialog(null, gewaehlt, "E", "", offenerBlock, {art:"vertretung"});
 };
 $("#bSchnellErsatz").onclick = () => {
-  dlgSchnell.close(); eintragOeffnen(null, gewaehlt, "E", "", offenerBlock);
+  dlgSchnell.close(); openEntryDialog(null, gewaehlt, "E", "", offenerBlock);
 };
 /* Langes Drücken gibt es mit Tastatur nicht — hier führt derselbe Weg hin. */
 $("#bSchnellInfo").onclick = () => { dlgSchnell.close(); subjectInfo(offenerBlock); };
@@ -1261,7 +1261,7 @@ $("#bFachMerk").onclick = () => { dlgFach.close(); ansicht = "eintraege"; einSub
    ===================================================================== */
 let bearbeiteId = null, ereignisId = null, noteId = null, bilder = [], ereignisArt = "ereignis";
 
-function fachAuswahlFuellen(wert){
+function fillSubjectSelect(wert){
   const liste = alleFaecher();
   eFach.innerHTML = `<option value="">— keins —</option>` +
     liste.map(f => `<option ${f === wert ? "selected" : ""}>${esc(f)}</option>`).join("") +
@@ -1326,17 +1326,17 @@ function renderDatePicker(){
     ? `Roter Punkt: ${fach} steht an diesem Tag im Plan.`
     : "Wähle oben ein Fach, dann werden die passenden Tage markiert.";
 }
-function datumWahlOeffnen(auf){
+function openDatePicker(auf){
   $("#eDatumWahl").classList.toggle("hidden", !auf);
   $("#eDatumFeld").setAttribute("aria-expanded", auf ? "true" : "false");
   if(auf){ eMonat = new Date((eDatum.value || iso(new Date()))+"T12:00"); renderDatePicker(); }
 }
-$("#eDatumFeld").onclick = () => datumWahlOeffnen($("#eDatumWahl").classList.contains("hidden"));
+$("#eDatumFeld").onclick = () => openDatePicker($("#eDatumWahl").classList.contains("hidden"));
 $("#eMonatMinus").onclick = () => { eMonat = new Date(eMonat.getFullYear(), eMonat.getMonth()-1, 1); renderDatePicker(); };
 $("#eMonatPlus").onclick  = () => { eMonat = new Date(eMonat.getFullYear(), eMonat.getMonth()+1, 1); renderDatePicker(); };
 $("#eGitter").onclick = e => {
   const b = e.target.closest("[data-wahl]"); if(!b) return;
-  eDatum.value = b.dataset.wahl; dateFieldText(); datumWahlOeffnen(false);
+  eDatum.value = b.dataset.wahl; dateFieldText(); openDatePicker(false);
 };
 
 /* --- Bilder: verkleinern, sonst platzt der Browserspeicher --- */
@@ -1383,7 +1383,7 @@ function defaultType(){
   if(ansicht === "zeugnis") return "G";
   return "H";
 }
-function eintragOeffnen(e, datum, typ, fach, slot, extra){
+function openEntryDialog(e, datum, typ, fach, slot, extra){
   bearbeiteId = e ? e.id : null;
   ereignisId = null; noteId = null; bilder = [];
   ereignisArt = (extra && extra.art) || "ereignis";
@@ -1404,13 +1404,13 @@ function eintragOeffnen(e, datum, typ, fach, slot, extra){
   if(vorhanden) eOrt.value = vorhanden.raum || "";
   stundenAuswahlFuellen(vorhanden ? vorhanden.slot : (slot === undefined ? null : slot));
   /* Nie ein Fach vorbelegen, außer es kommt eindeutig aus der angetippten Stunde. */
-  fachAuswahlFuellen(e ? e.fach : (fach || ""));
-  dateFieldText(); datumWahlOeffnen(false); toggleType();
+  fillSubjectSelect(e ? e.fach : (fach || ""));
+  dateFieldText(); openDatePicker(false); toggleType();
   $("#bEintragWeg").classList.toggle("hidden", !(e || vorhanden));
   saveLockOff();
   dlgEintrag.showModal();
 }
-function ereignisOeffnen(id){
+function openEventDialog(id){
   const o = sonder.find(x => x.id === id); if(!o) return;
   bearbeiteId = null; noteId = null; ereignisId = id; bilder = [];
   ereignisArt = o.art || "ereignis";
@@ -1418,26 +1418,26 @@ function ereignisOeffnen(id){
   eTyp.value = "E"; eDatum.value = o.datum;
   eText.value = o.titel; eNotiz.value = o.notiz || ""; eOrt.value = o.raum || "";
   stundenAuswahlFuellen(o.slot);
-  fachAuswahlFuellen("");
-  dateFieldText(); datumWahlOeffnen(false); toggleType();
+  fillSubjectSelect("");
+  dateFieldText(); openDatePicker(false); toggleType();
   $("#bEintragWeg").classList.remove("hidden");
   saveLockOff();
   dlgEintrag.showModal();
 }
-function noteOeffnen(n){
-  if(!n) return eintragOeffnen(null, new Date(), "G", "");
+function openGradeDialog(n){
+  if(!n) return openEntryDialog(null, new Date(), "G", "");
   bearbeiteId = null; ereignisId = null; noteId = n.id; bilder = [];
   $("#dlgEintragTitel").textContent = "Note ändern";
   eTyp.value = "G"; eDatum.value = n.datum;
   eText.value = n.titel || ""; eNotiz.value = n.notiz || "";
   eWert.value = String(n.wert).replace(".", ","); eNArt.value = n.art;
-  fachAuswahlFuellen(n.fach);
-  dateFieldText(); datumWahlOeffnen(false); toggleType();
+  fillSubjectSelect(n.fach);
+  dateFieldText(); openDatePicker(false); toggleType();
   $("#bEintragWeg").classList.remove("hidden");
   saveLockOff();
   dlgEintrag.showModal();
 }
-$("#btnEintrag").onclick = () => eintragOeffnen(null, ansicht === "kalender" ? kalTag : gewaehlt);
+$("#btnEintrag").onclick = () => openEntryDialog(null, ansicht === "kalender" ? kalTag : gewaehlt);
 $("#bEintragAb").onclick = () => dlgEintrag.close();
 
 /* Rapid multi-tapping must not duplicate an entry. A timeout instead of
@@ -1514,7 +1514,7 @@ function schauOeffnen(id){
 }
 $("#bSchauAb").onclick = () => dlgSchau.close();
 $("#bSchauBearbeiten").onclick = () => {
-  dlgSchau.close(); eintragOeffnen(eintraege.find(x => x.id === schauId));
+  dlgSchau.close(); openEntryDialog(eintraege.find(x => x.id === schauId));
 };
 
 /* --- Listenklicks --- */
@@ -1529,13 +1529,13 @@ function listClick(e){
   const schau = e.target.closest("[data-schau]");
   if(schau){ schauOeffnen(schau.dataset.schau); return; }
   const ereignis = e.target.closest("[data-ereignis]");
-  if(ereignis){ ereignisOeffnen(ereignis.dataset.ereignis); return; }
+  if(ereignis){ openEventDialog(ereignis.dataset.ereignis); return; }
   const anteil = e.target.closest("[data-anteil]");
   if(anteil){ openShareDialog(anteil.dataset.anteil); return; }
   const note = e.target.closest("[data-note]");
-  if(note){ noteOeffnen(noten.find(n => n.id === note.dataset.note)); return; }
+  if(note){ openGradeDialog(noten.find(n => n.id === note.dataset.note)); return; }
   const bea = e.target.closest("[data-bearbeite]");
-  if(bea) eintragOeffnen(eintraege.find(x => x.id === bea.dataset.bearbeite));
+  if(bea) openEntryDialog(eintraege.find(x => x.id === bea.dataset.bearbeite));
 }
 ["#tagListe","#kalListe","#einListe","#suchListe"].forEach(s => $(s).onclick = listClick);
 $("#einListe").addEventListener("click", e => {
@@ -1843,15 +1843,15 @@ function holidaysStatus(){
 
 /* Benachrichtigungen: nur beim Öffnen, denn eine Web-App kann sich nicht
    selbst wecken. Für echte Wecker gibt es den Kalender-Export. */
-function meldeStand(){
+function reportStatus(){
   const s = ("Notification" in window) ? Notification.permission : "nicht verfügbar";
   $("#sMeldeStand").textContent = "Berechtigung: " +
     ({granted:"erteilt", denied:"abgelehnt", default:"noch nicht gefragt"}[s] || s);
 }
 $("#sMeldeRecht").onclick = async () => {
-  if(!("Notification" in window)) return meldeStand();
+  if(!("Notification" in window)) return reportStatus();
   try{ await Notification.requestPermission(); }catch(e){}
-  meldeStand();
+  reportStatus();
 };
 /* Chrome auf Android verbietet new Notification() und verlangt den Umweg
    über den Service Worker. Der Rückgabewert sagt, ob wirklich etwas erschien —
@@ -1873,7 +1873,7 @@ async function melden(titel, text){
 }
 /* Die Tagesmerker sammeln sich sonst Jahr für Jahr an und zählen beim
    Speicherstand mit. Nur der von heute wird gebraucht. */
-function meldemerkerAufraeumen(){
+function cleanupReminderFlags(){
   const heute = "_gemeldet_" + iso(new Date());
   profilSchluessel(profilId)
     .filter(k => k.includes("_gemeldet_") && !k.endsWith(heute))
@@ -2081,7 +2081,7 @@ function sonderSaeubern(o){
           raum: alsText(o.raum, 40), notiz: alsText(o.notiz, 4000),
           geloescht: !!o.geloescht, geloeschtAm: alsDatum(o.geloeschtAm) || null};
 }
-function noteSaeubern(g){
+function sanitizeGrade(g){
   if(!g || typeof g !== "object") return null;
   const fach = alsKuerzel(g.fach); if(!fach) return null;
   const wert = Number(g.wert); if(!Number.isFinite(wert)) return null;
@@ -2100,7 +2100,7 @@ function paketSaeubern(d){
   if(Array.isArray(d.eintraege)) p.eintraege = d.eintraege.slice(0,5000).map(sanitizeEntry).filter(Boolean);
   if(Array.isArray(d.ferien))    p.ferien    = d.ferien.slice(0,2000).map(sanitizeFree).filter(Boolean);
   if(Array.isArray(d.sonder))    p.sonder    = d.sonder.slice(0,5000).map(sonderSaeubern).filter(Boolean);
-  if(Array.isArray(d.noten))     p.noten     = d.noten.slice(0,5000).map(noteSaeubern).filter(Boolean);
+  if(Array.isArray(d.noten))     p.noten     = d.noten.slice(0,5000).map(sanitizeGrade).filter(Boolean);
   return p;
 }
 
@@ -2978,9 +2978,9 @@ function openSettings(){
   if(sArchivTage.selectedIndex < 0) sArchivTage.value = "0";
   archiveNoticeSetting();
   reiheEinListe = reiheEin().slice();
-  reiheFachListe = fachReihenfolge().slice();
+  reiheFachListe = subjectOrder().slice();
   reihenZeichnen();
-  sMelden.checked = !!cfg.melden; meldeStand();
+  sMelden.checked = !!cfg.melden; reportStatus();
   sLehrer.value = paareText(cfg.lehrer); sFaecher.value = paareText(cfg.fachnamen);
   sLand.innerHTML = `<option value="">— wählen —</option>` +
     Object.entries(LAENDER).map(([k,v]) => `<option value="${k}" ${cfg.land === k ? "selected":""}>${v}</option>`).join("");
@@ -3310,7 +3310,7 @@ function initApp(){
   profileButton();
   render();
   checkVersion();
-  meldemerkerAufraeumen();
+  cleanupReminderFlags();
   checkReminders().catch(() => {});
   autoBackup().catch(() => {});
   /* Die Profilauswahl steht am Anfang, nicht nur bei mehreren Profilen:
