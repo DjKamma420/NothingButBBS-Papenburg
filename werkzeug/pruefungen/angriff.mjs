@@ -92,7 +92,7 @@ pruef("URL-Parameter ansicht nur aus Whitelist", url.boese === false && url.gut 
 const ics = await page.evaluate(() => {
   eintraege = [{id:"i1",typ:"K",fach:"MA",datum:iso(plusTage(new Date(),1)),
     titel:"Hallo\r\nBEGIN:VEVENT\r\nSUMMARY:INJ\r\n=1+2+cmd|' /C calc'!A0",notiz:"x",erledigt:false,geloescht:false}];
-  persistState(); return icsBauen();
+  persistState(); return buildIcs();
 });
 /* Physische Zeilen zählen: eine Injektion erzeugt eine Zeile, die exakt
    BEGIN:VEVENT lautet; Fortsetzungszeilen beginnen mit Leerzeichen. */

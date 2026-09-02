@@ -309,7 +309,7 @@ function cleanup(){
   let bewegt = false;
   eintraege.forEach(e => {
     if(!e.geloescht && e.erledigt && (e.typ === "H" || e.typ === "K")
-       && e.erledigtAm && e.erledigtAm <= grenze){ insArchiv(e); bewegt = true; }
+       && e.erledigtAm && e.erledigtAm <= grenze){ toArchive(e); bewegt = true; }
   });
   if(bewegt) Speicher.schreib("eintraege", eintraege);
   cleanupArchive();
@@ -348,7 +348,7 @@ function persistState(){
 }
 /* Archivieren und Zurückholen an einer Stelle: ohne geloeschtAm wüsste
    niemand, wann die Aufbewahrungsfrist abläuft. */
-function insArchiv(x){ x.geloescht = true; x.geloeschtAm = iso(new Date()); }
+function toArchive(x){ x.geloescht = true; x.geloeschtAm = iso(new Date()); }
 function fromArchive(x){ x.geloescht = false; x.geloeschtAm = null; }
 
 const aktiv        = () => eintraege.filter(e => !e.geloescht);
@@ -373,7 +373,7 @@ const alleFaecher = () => [...new Set([...subjects(), ...notenAktiv().map(n => n
 const lehrerName = k => (cfg.lehrer && cfg.lehrer[k]) || k || "";
 const fachName   = k => (cfg.fachnamen && cfg.fachnamen[k]) || k || "";
 const freiAm = d => { const s = iso(d); return ferien.find(f => s >= f.von && s <= f.bis) || null; };
-function hatFachAm(d, fach){
+function hasSubjectOn(d, fach){
   if(!fach) return false;
   const i = tagIndex(d); if(i === 5) return false;
   const woche = plan[wocheFuer(d)];
@@ -382,7 +382,7 @@ function hatFachAm(d, fach){
 function nextDayWithSubject(d, fach){
   for(let i = 1; i <= 120; i++){
     const x = plusTage(d, i);
-    if(hatFachAm(x, fach) && !freiAm(x)) return x;
+    if(hasSubjectOn(x, fach) && !freiAm(x)) return x;
   }
   return null;
 }
@@ -512,7 +512,7 @@ function renderDay(){
     let letzte = -1;
     cfg.slots.forEach((s,i) => { if(plan[woche][tag][i] || sonderAn(gewaehlt,i)) letzte = i; });
     const bis = letzte < 0 ? cfg.slots.length : letzte + 1;
-    const linie = jetztLinie(bis);
+    const linie = nowLine(bis);
 
     const teile = cfg.slots.slice(0, bis).map((s,i) => {
       const regulaer = plan[woche][tag][i];
@@ -530,7 +530,7 @@ function renderDay(){
         if(o.raum) unten += ` · ${esc(o.raum)}`;
         if(regulaer) unten += ` · <span class="durch">${esc(regulaer.fach)}</span>`;
       } else if(f) unten += ` · ${esc(f.raum) || "—"}${f.lk ? " · "+esc(f.lk) : ""}`;
-      return `<button type="button" class="block ${istAktuellerSlot(i) ? "jetzt" : ""} ${ausfall ? "ausfall" : ""}"
+      return `<button type="button" class="block ${isCurrentSlot(i) ? "jetzt" : ""} ${ausfall ? "ausfall" : ""}"
           data-block="${i}">
         <div class="zeit"><b>${esc(s.von)}</b>${esc(s.bis)}</div>
         <div>
@@ -589,7 +589,7 @@ function sicherungBanner(){
     </div>`;
 }
 $("#sicherBanner").onclick = e => {
-  if(e.target.closest("#bSicherJetzt")){ jetztSichern(true); return; }
+  if(e.target.closest("#bSicherJetzt")){ saveNow(true); return; }
   if(e.target.closest("#bSicherSpaeter")){
     Speicher.schreib("sicherSpaeter", iso(new Date())); render();
   }
@@ -608,15 +608,15 @@ $("#toast").onclick = () => $("#toast").classList.add("hidden");
 
 const istHeuteSchultag = () =>
   gleich(gewaehlt, new Date()) && tagIndex(gewaehlt) !== 5 && cfg.slots.length && !freiAm(gewaehlt);
-function istAktuellerSlot(i){
+function isCurrentSlot(i){
   if(!istHeuteSchultag()) return false;
   const j = jetztMin();
   return j >= minuten(cfg.slots[i].von) && j < minuten(cfg.slots[i].bis);
 }
-function jetztLinie(bis){
+function nowLine(bis){
   if(!istHeuteSchultag()) return null;
   const j = jetztMin();
-  if(cfg.slots.some((s,i) => istAktuellerSlot(i))) return null;
+  if(cfg.slots.some((s,i) => isCurrentSlot(i))) return null;
   if(j < minuten(cfg.slots[0].von)) return 0;
   for(let i = 0; i < bis-1; i++)
     if(j >= minuten(cfg.slots[i].bis) && j < minuten(cfg.slots[i+1].von)) return i+1;
@@ -630,7 +630,7 @@ function renderProgress(){
   const inhalt = i => sonderAn(gewaehlt,i) || plan[woche][tag][i];
   const ersteVon = minuten(cfg.slots[0].von), letzteBis = minuten(cfg.slots.at(-1).bis);
   let anteil = 0, links = "", rechts = "";
-  const i = cfg.slots.findIndex((s,k) => istAktuellerSlot(k));
+  const i = cfg.slots.findIndex((s,k) => isCurrentSlot(k));
   if(i >= 0){
     const s = cfg.slots[i], von = minuten(s.von), bis = minuten(s.bis);
     anteil = (j - von)/(bis - von);
@@ -726,7 +726,7 @@ function reiheEin(){
   const w = Array.isArray(cfg.reiheEin) ? cfg.reiheEin.filter(x => REIHE_STANDARD.includes(x)) : [];
   return [...w, ...REIHE_STANDARD.filter(x => !w.includes(x))];
 }
-function kachelnZeichnen(){
+function renderTiles(){
   $("#einKacheln").innerHTML = reiheEin().map(k =>
     `<button type="button" data-sub="${k}">${ARTLANG[k]}<small id="zahl${k}"></small></button>`).join("");
 }
@@ -773,7 +773,7 @@ function renderEntries(){
   $("#einSubHinweis").style.color = "";
 
   if(einSub === null){
-    kachelnZeichnen();
+    renderTiles();
     const off = t => listeVonTyp(t).filter(e => !e.erledigt).length;
     const std = fehlStunden();
     const zaehler = {
@@ -982,7 +982,7 @@ $("#gitter").onclick = e => {
   const jetzt = Date.now();
   const doppelt = letzterKalTipp.datum === b.dataset.kal && jetzt - letzterKalTipp.zeit < 450;
   letzterKalTipp = {datum: doppelt ? null : b.dataset.kal, zeit: jetzt};
-  if(doppelt){ kalMenuOeffnen(b.dataset.kal); return; }
+  if(doppelt){ openCalendarMenu(b.dataset.kal); return; }
   kalTag = new Date(b.dataset.kal+"T12:00"); render();
 };
 
@@ -1032,14 +1032,14 @@ $("#ansichtEin").addEventListener("click", e => {
     uhr = setTimeout(() => {
       langKal = true;
       if(navigator.vibrate) navigator.vibrate(15);
-      kalMenuOeffnen(b.dataset.kal);
+      openCalendarMenu(b.dataset.kal);
     }, 500);
   }, {passive:true});
   ["touchmove","touchend","touchcancel"].forEach(t =>
     g.addEventListener(t, () => { clearTimeout(uhr); }, {passive:true}));
   g.addEventListener("contextmenu", e => {
     const b = feld(e); if(!b) return;
-    e.preventDefault(); kalMenuOeffnen(b.dataset.kal);
+    e.preventDefault(); openCalendarMenu(b.dataset.kal);
   });
   g.addEventListener("click", e => { if(langKal){ langKal = false; e.stopPropagation(); } }, true);
 })();
@@ -1047,7 +1047,7 @@ $("#ansichtEin").addEventListener("click", e => {
 /* Was an einem Kalendertag angelegt werden kann. Der freie Tag war früher
    das Einzige — der Kalender kann jetzt auch das, was ein Kalender kann. */
 let kalMenuDatum = null;
-function kalMenuOeffnen(datum){
+function openCalendarMenu(datum){
   kalMenuDatum = datum;
   kalTag = new Date(datum + "T12:00");
   const frei = freiAm(kalTag);
@@ -1319,7 +1319,7 @@ function renderDatePicker(){
     html += `<button type="button" class="tagfeld ${d.getMonth() !== eMonat.getMonth() ? "fremd" : ""}
        ${gleich(d,new Date()) ? "heute" : ""} ${freiAm(d) ? "ferien" : ""}"
        aria-pressed="${eDatum.value === iso(d)}" data-wahl="${iso(d)}">
-       ${d.getDate()}${hatFachAm(d,fach) ? '<span class="punktfach"></span>' : ""}</button>`;
+       ${d.getDate()}${hasSubjectOn(d,fach) ? '<span class="punktfach"></span>' : ""}</button>`;
   }
   $("#eGitter").innerHTML = html;
   $("#eGitterHinweis").textContent = fach
@@ -1497,7 +1497,7 @@ $("#bEintragWeg").onclick = () => {
   const ziel = ereignisId ? sonder.find(x => x.id === ereignisId)
              : noteId     ? noten.find(x => x.id === noteId)
              :              eintraege.find(x => x.id === bearbeiteId);
-  if(ziel) insArchiv(ziel);
+  if(ziel) toArchive(ziel);
   persistState(); dlgEintrag.close(); render();
 };
 
@@ -1669,7 +1669,7 @@ function textLesen(text){
   }
   return proStunde;
 }
-function importTabelle(werte){
+function importTable(werte){
   $("#iTabelle").innerHTML = cfg.slots.map((sl,i) => {
     const v = werte[i] || {};
     return `<div class="izeile" data-zeile="${i}">
@@ -1685,9 +1685,9 @@ const importAuslesen = () => [...document.querySelectorAll("#iTabelle .izeile")]
   raum:z.querySelector('[data-f=raum]').value.trim(),
   lk:z.querySelector('[data-f=lk]').value.trim()
 }));
-const importLaden = () => importTabelle((plan[cfg.zweiWochen ? iWoche.value : "A"][TAGE[+iTag.value]] || []).map(x => x || {}));
+const importLaden = () => importTable((plan[cfg.zweiWochen ? iWoche.value : "A"][TAGE[+iTag.value]] || []).map(x => x || {}));
 let zurueckZuEinst = false;
-function importOeffnen(){
+function openImport(){
   iTag.innerHTML = TAGE.map((t,i) =>
     `<option value="${i}" ${i === Math.min(tagIndex(gewaehlt),4) ? "selected" : ""}>${LANG[t]}</option>`).join("");
   iWoche.value = wocheFuer(gewaehlt);
@@ -1703,7 +1703,7 @@ $("#bImportText").onclick = () => {
     return z ? {fach:z.fach, raum:z.raum, lk:z.lk || z.klasse} : {};
   });
   const treffer = werte.filter(w => w.fach).length;
-  if(treffer){ importTabelle(werte); $("#iErgebnis").textContent = `${treffer} Zeilen übernommen. Prüfen und speichern.`; }
+  if(treffer){ importTable(werte); $("#iErgebnis").textContent = `${treffer} Zeilen übernommen. Prüfen und speichern.`; }
   else $("#iErgebnis").textContent = "Nichts erkannt. Die Stundennummern müssen mitkopiert sein.";
 };
 $("#bImportAb").onclick = () => { dlgImport.close(); if(zurueckZuEinst){ zurueckZuEinst = false; openSettings(); } };
@@ -1790,7 +1790,7 @@ $("#pGitter").onclick = e => {
 /* =====================================================================
    Ferien, Erinnerungen, Kalender-Export
    ===================================================================== */
-async function ferienLaden(land){
+async function loadHolidays(land){
   const j = new Date().getFullYear();
   const url = a => `https://openholidaysapi.org/${a}?countryIsoCode=DE&subdivisionCode=${land}`
     + `&languageIsoCode=DE&validFrom=${j}-01-01&validTo=${j+1}-12-31`;
@@ -1821,8 +1821,8 @@ $("#sFerienLaden").onclick = async () => {
   $("#sFerienStand").textContent = "Wird geladen …";
   try{
     const eigene = ferien.filter(f => f.typ === "eigen");   // selbst eingetragene behalten
-    ferien = [...await ferienLaden(land), ...eigene].sort((a,b) => a.von.localeCompare(b.von));
-    cfg.land = land; persistState(); ferienStand(); render();
+    ferien = [...await loadHolidays(land), ...eigene].sort((a,b) => a.von.localeCompare(b.von));
+    cfg.land = land; persistState(); holidaysStatus(); render();
   }catch(err){
     $("#sFerienStand").textContent = (err && err.name === "AbortError")
       ? "Der Dienst antwortet nicht. Später noch einmal versuchen."
@@ -1831,9 +1831,9 @@ $("#sFerienLaden").onclick = async () => {
 };
 $("#sFerienWeg").onclick = () => {
   ferien = ferien.filter(f => f.typ === "eigen");
-  persistState(); ferienStand(); render();
+  persistState(); holidaysStatus(); render();
 };
-function ferienStand(){
+function holidaysStatus(){
   const eigene = ferien.filter(f => f.typ === "eigen").length;
   $("#sFerienStand").textContent = (eigene ? `${zahl(eigene,"eigener Tag","eigene Tage")} · ` : "")
     + (ferien.length
@@ -1906,7 +1906,7 @@ const icsFolgetag = datum => icsTag(iso(plusTage(new Date(datum+"T12:00"), 1)));
 const icsZeit = (datum, uhr) => icsTag(datum) + "T" + uhr.replace(":","") + "00";
 /* RFC 5545: höchstens 75 Oktette je Zeile, Fortsetzung mit führendem
    Leerzeichen. Ohne das brechen strenge Kalender an langen Notizen ab. */
-function icsFalten(zeile){
+function foldIcsLine(zeile){
   const teile = []; let akt = "", grenze = 75;
   for(const zeichen of zeile){
     if(oktette(akt + zeichen) > grenze){ teile.push(akt); akt = ""; grenze = 74; }
@@ -1915,7 +1915,7 @@ function icsFalten(zeile){
   teile.push(akt);
   return teile.map((t,i) => i ? " " + t : t);
 }
-function icsBauen(){
+function buildIcs(){
   const roh = t => String(t == null ? "" : t).replace(/[\\;,]/g, m => "\\"+m).replace(/\r?\n/g, "\\n");
   const stempel = new Date().toISOString().replace(/[-:]/g,"").split(".")[0]+"Z";
   const zeilen = ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Stundenplan//DE","CALSCALE:GREGORIAN",
@@ -1945,7 +1945,7 @@ function icsBauen(){
         o.titel + (o.raum ? " · " + o.raum : ""), o.notiz, "PT15H");
     });
   zeilen.push("END:VCALENDAR");
-  return zeilen.filter(Boolean).flatMap(icsFalten).join("\r\n") + "\r\n";
+  return zeilen.filter(Boolean).flatMap(foldIcsLine).join("\r\n") + "\r\n";
 }
 function downloadFile(text, name, typ){
   const url = URL.createObjectURL(new Blob([text], {type:typ}));
@@ -1954,7 +1954,7 @@ function downloadFile(text, name, typ){
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
-$("#sIcs").onclick = () => downloadFile(icsBauen(), `stundenplan-termine-${iso(new Date())}.ics`, "text/calendar");
+$("#sIcs").onclick = () => downloadFile(buildIcs(), `stundenplan-termine-${iso(new Date())}.ics`, "text/calendar");
 
 /* =====================================================================
    Sicherungen prüfen
@@ -2064,7 +2064,7 @@ function sanitizeEntry(e){
   }
   return raus;
 }
-function freiSaeubern(f){
+function sanitizeFree(f){
   if(!f || typeof f !== "object") return null;
   const von = alsDatum(f.von); if(!von) return null;
   const bis = alsDatum(f.bis) || von;
@@ -2098,7 +2098,7 @@ function paketSaeubern(d){
   if(d.cfg  && typeof d.cfg  === "object") p.cfg  = sanitizeConfig(d.cfg);
   if(d.plan && typeof d.plan === "object") p.plan = planSaeubern(d.plan);
   if(Array.isArray(d.eintraege)) p.eintraege = d.eintraege.slice(0,5000).map(sanitizeEntry).filter(Boolean);
-  if(Array.isArray(d.ferien))    p.ferien    = d.ferien.slice(0,2000).map(freiSaeubern).filter(Boolean);
+  if(Array.isArray(d.ferien))    p.ferien    = d.ferien.slice(0,2000).map(sanitizeFree).filter(Boolean);
   if(Array.isArray(d.sonder))    p.sonder    = d.sonder.slice(0,5000).map(sonderSaeubern).filter(Boolean);
   if(Array.isArray(d.noten))     p.noten     = d.noten.slice(0,5000).map(noteSaeubern).filter(Boolean);
   return p;
@@ -2116,7 +2116,7 @@ const ordnerMoeglich = () => typeof window.showDirectoryPicker === "function" &&
 const IDB_NAME = "stundenplan", IDB_LAGER = "griffe";
 let ordner = null;                                   // Griff für diese Sitzung
 
-function idbOeffnen(){
+function openIdb(){
   return new Promise((fertig, weg) => {
     let a;
     try{ a = indexedDB.open(IDB_NAME, 1); }catch(e){ return weg(e); }
@@ -2127,8 +2127,8 @@ function idbOeffnen(){
     a.onerror   = () => weg(a.error);
   });
 }
-async function griffLegen(wert){
-  const db = await idbOeffnen();
+async function storeFolderHandle(wert){
+  const db = await openIdb();
   return new Promise((fertig, weg) => {
     const lager = db.transaction(IDB_LAGER, "readwrite").objectStore(IDB_LAGER);
     const a = wert === null ? lager.delete("ordner") : lager.put(wert, "ordner");
@@ -2139,7 +2139,7 @@ async function griffLegen(wert){
 async function ordnerLaden(){
   if(!ordnerMoeglich()) return null;
   try{
-    const db = await idbOeffnen();
+    const db = await openIdb();
     ordner = await new Promise(fertig => {
       const a = db.transaction(IDB_LAGER, "readonly").objectStore(IDB_LAGER).get("ordner");
       a.onsuccess = () => fertig(a.result || null);
@@ -2194,7 +2194,7 @@ async function ordnerAufraeumen(){
   return weg;
 }
 /** Schreibt die Sicherung in den Ordner. null heißt: kein Ordner verfügbar. */
-async function inOrdnerSichern(fragen){
+async function saveToFolder(fragen){
   if(!await ordnerBereit(fragen)) return null;
   const name = sicherungDateiname();
   const datei = await ordner.getFileHandle(name, {create:true});
@@ -2206,9 +2206,9 @@ async function inOrdnerSichern(fragen){
   return {name, weg};
 }
 /** Erst den Ordner versuchen, sonst herunterladen. Immer eine echte Sicherung. */
-async function jetztSichern(fragen){
+async function saveNow(fragen){
   try{
-    const fertig = await inOrdnerSichern(fragen);
+    const fertig = await saveToFolder(fragen);
     if(fertig){
       shortHint(`Gesichert: ${fertig.name}`
         + (fertig.weg ? ` · ${zahl(fertig.weg,"alte Datei","alte Dateien")} entfernt` : ""));
@@ -2225,7 +2225,7 @@ async function autoBackup(){
   if(!cfg.sicherAuto || !sicherungFaellig()) return;
   await ordnerLaden();
   try{
-    const fertig = await inOrdnerSichern(false);
+    const fertig = await saveToFolder(false);
     if(fertig) shortHint(`Sicherung angelegt: ${fertig.name}`
       + (fertig.weg ? ` · ${zahl(fertig.weg,"alte Datei","alte Dateien")} entfernt` : ""));
   }catch(e){}
@@ -2699,7 +2699,7 @@ MA = Mathematik</pre>
 
 /* Sucht nur in den Textknoten. Über den fertigen HTML-Text zu ersetzen
    würde Treffer mitten in Attributnamen markieren und das Markup zerreissen. */
-function hilfeMarkieren(wurzel, wort){
+function highlightHelp(wurzel, wort){
   if(!wort) return;
   const lauf = document.createTreeWalker(wurzel, NodeFilter.SHOW_TEXT);
   const knoten = [];
@@ -2722,7 +2722,7 @@ function hilfeMarkieren(wurzel, wort){
   });
 }
 
-function hilfeZeichnen(){
+function renderHelp(){
   const wort = ($("#hilfeSuche").value || "").trim();
   const klein = wort.toLowerCase();
   const passt = a => !klein
@@ -2755,19 +2755,19 @@ function hilfeZeichnen(){
     return kopf + `<section class="hAbschnitt" id="h-${esc(a.id)}">
       <h3>${esc(a.titel)}</h3>${a.text}</section>`;
   }).join("");
-  if(klein) hilfeMarkieren($("#hilfeInhalt"), wort);
+  if(klein) highlightHelp($("#hilfeInhalt"), wort);
 }
 
 function openHelp(){
   $("#hilfeSuche").value = "";
-  hilfeZeichnen();
+  renderHelp();
   dlgHilfe.showModal();
   $("#hilfeKoerper").scrollTop = 0;
 }
 $("#btnHilfe").onclick = openHelp;
 $("#bHilfeAb").onclick = () => dlgHilfe.close();
 $("#bHilfeOben").onclick = () => { $("#hilfeKoerper").scrollTop = 0; };
-$("#hilfeSuche").oninput = hilfeZeichnen;
+$("#hilfeSuche").oninput = renderHelp;
 $("#hilfeVerzeichnis").onclick = e => {
   const b = e.target.closest("[data-zu]"); if(!b) return;
   const ziel = document.getElementById("h-" + b.dataset.zu);
@@ -2947,18 +2947,18 @@ $("#sOrdnerWahl").onclick = async () => {
   try{
     const gewaehlterOrdner = await window.showDirectoryPicker({mode:"readwrite", id:"stundenplan"});
     ordner = gewaehlterOrdner;
-    await griffLegen(ordner);
+    await storeFolderHandle(ordner);
     ordnerStand();
   }catch(e){ if(e && e.name !== "AbortError") showError("Ordner: " + ((e && e.message) || e)); }
 };
 $("#sOrdnerWeg").onclick = async () => {
   ordner = null;
-  try{ await griffLegen(null); }catch(e){}
+  try{ await storeFolderHandle(null); }catch(e){}
   ordnerStand();
 };
 $("#sOrdnerJetzt").onclick = async () => {
   if(!ordner) return alert("Wähle zuerst einen Ordner.");
-  await jetztSichern(true);
+  await saveNow(true);
   ordnerStand();
 };
 function openSettings(){
@@ -2984,7 +2984,7 @@ function openSettings(){
   sLehrer.value = paareText(cfg.lehrer); sFaecher.value = paareText(cfg.fachnamen);
   sLand.innerHTML = `<option value="">— wählen —</option>` +
     Object.entries(LAENDER).map(([k,v]) => `<option value="${k}" ${cfg.land === k ? "selected":""}>${v}</option>`).join("");
-  ferienStand();
+  holidaysStatus();
   /* Ein Wert, den die Auswahl nicht kennt, lässt selectedIndex auf -1 fallen. */
   sRhythmus.value = String(Math.max(0, Number(cfg.sicherTage) || 0));
   if(sRhythmus.selectedIndex < 0) sRhythmus.value = "28";
@@ -3009,7 +3009,7 @@ sZweiWochen.onchange = () => {
   $("#ankerWrap").classList.toggle("hidden", !sZweiWochen.checked);
   $("#sWocheKopieren").classList.toggle("hidden", !sZweiWochen.checked);
 };
-$("#sImport").onclick = () => { zurueckZuEinst = true; dlgEinst.close(); importOeffnen(); };
+$("#sImport").onclick = () => { zurueckZuEinst = true; dlgEinst.close(); openImport(); };
 /* A- und B-Woche unterscheiden sich meist nur in ein, zwei Stunden.
    Einmal kopieren spart, den ganzen Plan zweimal einzutragen. */
 $("#sWocheKopieren").onclick = e => {
@@ -3032,14 +3032,14 @@ document.querySelectorAll("[data-vorlage]").forEach(b =>
   b.onclick = () => slotEditorZeichnen(VORLAGEN[b.dataset.vorlage]));
 $("#sFarbVorlagen").onclick = e => {
   const b = e.target.closest("[data-farbe]"); if(!b) return;
-  sFarbe.value = b.dataset.farbe; sFarbeHex.value = b.dataset.farbe; farbeVorschau();
+  sFarbe.value = b.dataset.farbe; sFarbeHex.value = b.dataset.farbe; colorPreview();
 };
-function farbeVorschau(){
+function colorPreview(){
   const v = sFarbeHex.value.trim();
   if(/^#[0-9a-fA-F]{6}$/.test(v)) document.documentElement.style.setProperty("--akzent", v);
 }
-sFarbe.oninput = () => { sFarbeHex.value = sFarbe.value; farbeVorschau(); };
-sFarbeHex.oninput = () => { if(/^#[0-9a-fA-F]{6}$/.test(sFarbeHex.value.trim())) sFarbe.value = sFarbeHex.value.trim(); farbeVorschau(); };
+sFarbe.oninput = () => { sFarbeHex.value = sFarbe.value; colorPreview(); };
+sFarbeHex.oninput = () => { if(/^#[0-9a-fA-F]{6}$/.test(sFarbeHex.value.trim())) sFarbe.value = sFarbeHex.value.trim(); colorPreview(); };
 sModus.onchange = () => { cfg.modus = sModus.value; themaAnwenden(); };
 sSchrift.onchange = () => { cfg.schrift = sSchrift.value; themaAnwenden(); };
 
