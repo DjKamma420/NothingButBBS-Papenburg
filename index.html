@@ -32,7 +32,10 @@ body.hell{
 }
 body.schrift-mono{ --sans:var(--mono) }
 body.schrift-serif{ --sans:ui-serif,Georgia,"Times New Roman",serif }
-*{box-sizing:border-box}
+/* Without this a single very long word (a long title, pasted text with no
+   spaces) pushes the whole page wide — applies to any element, hence
+   global rather than patched onto individual classes. */
+*{box-sizing:border-box;overflow-wrap:break-word}
 html,body{margin:0;background:var(--ink);color:var(--text);font-family:var(--sans);
   -webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%;text-size-adjust:100%}
 body{padding:14px 16px 158px;max-width:640px;margin:0 auto;
@@ -121,7 +124,10 @@ section{margin-top:30px}
 .liste{list-style:none;padding:0;margin:10px 0 0}
 .liste li{display:flex;gap:11px;align-items:flex-start;padding:12px 0;border-top:1px solid var(--line)}
 .liste .kopf{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
-.liste .titel{font-size:15px}
+/* min-width:0 because .titel is a flex child of .kopf and inherits
+   min-width:auto otherwise — that blocks shrinking below content width
+   and defeats overflow-wrap entirely, no matter how narrow the container. */
+.liste .titel{font-size:15px;min-width:0}
 .liste .weg .titel{color:var(--muted);text-decoration:line-through}
 .liste .notiz{font-size:13px;color:var(--muted);margin-top:3px;white-space:pre-wrap}
 .wann{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.06em;margin-top:3px}

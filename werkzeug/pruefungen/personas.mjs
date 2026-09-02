@@ -1,6 +1,6 @@
 /* Nutzer-Perspektiven: alt/wenig technikaffin, jung/stresstestend, unachtsam. */
 import { starte, ende, pruef, fehlerkasten } from "../browser.mjs";
-const { page, browser } = await starte({ geraet:"handy", breite:390, hoehe:850 });
+const { page, browser } = await starte({ geraet:"handy", breite:390, hoehe:850, dialogeJa:false });
 
 /* Etwas Plan, damit Knöpfe da sind. */
 await page.evaluate(() => {
@@ -24,7 +24,8 @@ const ohneLabel = await page.evaluate(() => {
 });
 pruef("kein sichtbarer Knopf ohne Text und ohne aria-label", ohneLabel.length === 0, ohneLabel.join(", "));
 
-/* Tap-Ziele: primäre Bedienknöpfe sollten nicht winzig sein (Richtwert 32px). */
+/* Tap-Ziele: WCAG 2.5.8 (AA) verlangt mindestens 24x24px, nicht die oft
+   zitierten 44x44 (das ist AAA/Apple HIG). */
 const winzig = await page.evaluate(() => {
   const raus = [];
   document.querySelectorAll("button, input, select, .tagfeld, .block").forEach(el => {
@@ -32,11 +33,11 @@ const winzig = await page.evaluate(() => {
     const r = el.getBoundingClientRect();
     if (r.width < 1 || r.height < 1) return;
     const klein = Math.min(r.width, r.height);
-    if (klein < 30) raus.push((el.id||el.className||el.tagName) + " " + Math.round(r.width) + "x" + Math.round(r.height));
+    if (klein < 24) raus.push((el.id||el.className||el.tagName) + " " + Math.round(r.width) + "x" + Math.round(r.height));
   });
   return raus;
 });
-pruef("keine winzigen Tap-Ziele (<30px) in der Tagesansicht", winzig.length === 0, winzig.slice(0,6).join(" · "));
+pruef("keine Tap-Ziele unter WCAG-AA-Minimum (24px)", winzig.length === 0, winzig.slice(0,6).join(" · "));
 
 /* Kontrast der gedämpften Schrift gegen den Hintergrund (WCAG). */
 const kontrast = await page.evaluate(() => {
@@ -108,7 +109,7 @@ pruef("kein Fehler bei 500 Einträgen", (await fehlerkasten(page)) === null);
 /* ---------- UNACHTSAM ---------- */
 
 let gefragt = [];
-page.on("dialog", d => { gefragt.push(d.message()); });   // NICHT bestätigen: Vorgang muss abbrechen
+page.on("dialog", async d => { gefragt.push(d.message()); await d.dismiss(); });   // ausdrücklich ablehnen
 await page.evaluate(() => { window.__vorReset = eintraege.length; einstellungenOeffnen(); });
 await page.waitForTimeout(200);
 await page.click("#sReset"); await page.waitForTimeout(200);

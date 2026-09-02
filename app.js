@@ -6,7 +6,7 @@
    ===================================================================== */
 
 /* --- Fehleranzeige zuerst: eine leere Seite sagt niemandem etwas --- */
-function zeigeFehler(text, quelle){
+function showError(text, quelle){
   try{
     let k = document.getElementById("fehlerkasten");
     if(!k){
@@ -18,24 +18,24 @@ function zeigeFehler(text, quelle){
         + "white-space:pre-wrap;max-height:52vh;overflow:auto";
       (document.body || document.documentElement).appendChild(k);
     }
-    let umgebung = "";
+    let environment = "";
     try{
-      umgebung = "\n" + (typeof BUILD === "string" ? BUILD : "?")
+      environment = "\n" + (typeof BUILD === "string" ? BUILD : "?")
         + " · " + (navigator.language || "?")
         + " · " + (screen.width + "×" + screen.height)
         + " · " + navigator.userAgent.slice(0, 120);
     }catch(e){}
-    k.textContent = "Fehler\n" + text + (quelle ? "\n" + quelle : "") + umgebung
+    k.textContent = "Fehler\n" + text + (quelle ? "\n" + quelle : "") + environment
       + "\n\nBitte diesen Text weitergeben. Deine Daten sind nicht betroffen.";
     /* Wer hier steht, kommt sonst nicht weiter. Die häufigste Ursache ist eine
        halb erneuerte Fassung — neues index.html, altes app.js. Ein Neuladen
        ohne Zwischenspeicher behebt genau das. Der Speicher bleibt unberührt. */
-    const knopf = document.createElement("button");
-    knopf.textContent = "App neu laden";
-    knopf.style.cssText = "margin-top:12px;font:inherit;background:#fff;color:#e5382b;"
+    const button = document.createElement("button");
+    button.textContent = "App neu laden";
+    button.style.cssText = "margin-top:12px;font:inherit;background:#fff;color:#e5382b;"
       + "border:0;border-radius:8px;padding:9px 14px;font-weight:700";
-    knopf.onclick = async () => {
-      knopf.textContent = "Lädt …";
+    button.onclick = async () => {
+      button.textContent = "Lädt …";
       try{
         if(window.caches) for(const name of await caches.keys()) await caches.delete(name);
         if("serviceWorker" in navigator){
@@ -45,15 +45,15 @@ function zeigeFehler(text, quelle){
       }catch(e){}
       location.reload();
     };
-    k.appendChild(knopf);
+    k.appendChild(button);
   }catch(e){}
 }
 window.addEventListener("error", e => {
   const datei = (e.filename || "").split("/").pop();
-  zeigeFehler(e.message, datei ? `${datei}, Zeile ${e.lineno}` : "");
+  showError(e.message, datei ? `${datei}, Zeile ${e.lineno}` : "");
 });
 window.addEventListener("unhandledrejection", e =>
-  zeigeFehler("Unerledigt: " + ((e.reason && e.reason.message) || e.reason)));
+  showError("Unerledigt: " + ((e.reason && e.reason.message) || e.reason)));
 
 /* Fassung der Daten im Speicher — nicht die der App. Sie steigt nur, wenn
    sich die Form der gespeicherten Daten ändert, und gibt späteren
@@ -131,7 +131,7 @@ const ARTLANG = {H:"Hausaufgaben",K:"Klausuren",N:"Notizen",E:"Ereignisse",
 
 /* Date.now() allein kollidiert, sobald zwei Einträge in derselben
    Millisekunde entstehen — beim Einlesen einer Sicherung passiert genau das. */
-const neueId = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+const createId = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
 
 /* --- Speicher, an das aktive Profil gebunden --- */
 const Speicher = {
@@ -144,7 +144,7 @@ const Speicher = {
   schreib(k, v){
     this.puffer[k] = v;
     try{ localStorage.setItem(this.pfad(k), JSON.stringify(v)); }
-    catch(e){ zeigeFehler("Speicher voll. Lösche Bilder aus Merkblättern oder lege eine Sicherung an."); }
+    catch(e){ showError("Speicher voll. Lösche Bilder aus Merkblättern oder lege eine Sicherung an."); }
   },
   entferne(k){
     delete this.puffer[k];
@@ -160,7 +160,7 @@ function profilSchluessel(id){
 
 const DATEN = ["cfg","plan","eintraege","ferien","sonder","noten","merkblatt"];
 let profile = [], profilId = "1";
-function profileSichern(){
+function saveProfiles(){
   try{
     localStorage.setItem("profile", JSON.stringify(profile));
     localStorage.setItem("profilAktiv", profilId);
@@ -179,7 +179,7 @@ function profileLaden(){
       const v = localStorage.getItem(k);
       if(v !== null){ localStorage.setItem("p1_" + k, v); localStorage.removeItem(k); }
     }catch(e){} });
-    profileSichern();
+    saveProfiles();
   }
   if(!profile.some(x => x.id === profilId)) profilId = profile[0].id;
 }
@@ -206,7 +206,7 @@ function datenMigrieren(){
   const war = Number(cfg.fassung) || 0;
   if(war === SCHEMA) return;
   if(war > SCHEMA){
-    zeigeFehler("Diese Daten stammen aus einer neueren Fassung der App "
+    showError("Diese Daten stammen aus einer neueren Fassung der App "
       + `(Datenstand ${war}, diese App kennt ${SCHEMA}). `
       + "Aktualisiere die App, bevor du weiterarbeitest.");
     return;
@@ -220,7 +220,7 @@ function merkblattUmziehen(){
   const alt = Speicher.lies("merkblatt", null);
   if(alt && typeof alt === "object" && !Array.isArray(alt)){
     Object.entries(alt).forEach(([fach, text]) => {
-      if(text) eintraege.push({id:neueId(), typ:"M", fach, datum:iso(new Date()),
+      if(text) eintraege.push({id:createId(), typ:"M", fach, datum:iso(new Date()),
         titel:"Merkblatt", notiz:text, bilder:[], erledigt:false, geloescht:false});
     });
     Speicher.schreib("merkblatt", []);
@@ -453,7 +453,7 @@ function zeichne(){
     else if(ansicht === "kalender") zeichneKalender();
     else if(ansicht === "zeugnis") zeichneZeugnis();
     else zeichneEintraege();
-  }catch(e){ zeigeFehler("Ansicht \u201e"+ansicht+"\u201c: "+e.message, (e.stack||"").split("\n")[1]||""); }
+  }catch(e){ showError("Ansicht \u201e"+ansicht+"\u201c: "+e.message, (e.stack||"").split("\n")[1]||""); }
 }
 
 function zeichneTag(){
@@ -1202,7 +1202,7 @@ $("#bSchnellAusfall").onclick = () => {
   dlgSchnell.close();
   const datum = iso(gewaehlt);
   sonder = sonder.filter(x => !(x.datum === datum && x.slot === offenerBlock));
-  sonder.push({id:neueId(), datum, slot:offenerBlock, art:"ausfall",
+  sonder.push({id:createId(), datum, slot:offenerBlock, art:"ausfall",
                titel:"Fällt aus", raum:"", notiz:"", geloescht:false});
   sichern(); zeichne();
 };
@@ -1371,7 +1371,7 @@ function bildVerkleinern(datei, fertig){
       c.getContext("2d").drawImage(bild, 0, 0, c.width, c.height);
       fertig(c.toDataURL("image/jpeg", 0.7));
     };
-    bild.onerror = () => zeigeFehler("Bild ließ sich nicht lesen.");
+    bild.onerror = () => showError("Bild ließ sich nicht lesen.");
     bild.src = leser.result;
   };
   leser.readAsDataURL(datei);
@@ -1407,6 +1407,7 @@ function eintragOeffnen(e, datum, typ, fach, slot, extra){
   fachAuswahlFuellen(e ? e.fach : (fach || ""));
   datumFeldText(); datumWahlOeffnen(false); artUmschalten();
   $("#bEintragWeg").classList.toggle("hidden", !(e || vorhanden));
+  saveLockOff();
   dlgEintrag.showModal();
 }
 function ereignisOeffnen(id){
@@ -1420,6 +1421,7 @@ function ereignisOeffnen(id){
   fachAuswahlFuellen("");
   datumFeldText(); datumWahlOeffnen(false); artUmschalten();
   $("#bEintragWeg").classList.remove("hidden");
+  saveLockOff();
   dlgEintrag.showModal();
 }
 function noteOeffnen(n){
@@ -1432,12 +1434,24 @@ function noteOeffnen(n){
   fachAuswahlFuellen(n.fach);
   datumFeldText(); datumWahlOeffnen(false); artUmschalten();
   $("#bEintragWeg").classList.remove("hidden");
+  saveLockOff();
   dlgEintrag.showModal();
 }
 $("#btnEintrag").onclick = () => eintragOeffnen(null, ansicht === "kalender" ? kalTag : gewaehlt);
 $("#bEintragAb").onclick = () => dlgEintrag.close();
 
+/* Rapid multi-tapping must not duplicate an entry. A timeout instead of
+   plain "disabled" so a dialog opened right after doesn't stay locked by a
+   previous save (saveLockOff). */
+let saveLock = null;
+function saveLockOff(){
+  clearTimeout(saveLock); saveLock = null;
+  $("#bEintragSpeichern").disabled = false;
+}
 $("#bEintragSpeichern").onclick = () => {
+  if(saveLock) return;
+  $("#bEintragSpeichern").disabled = true;
+  saveLock = setTimeout(saveLockOff, 600);
   const datum = eDatum.value || iso(new Date());
   const fach = aktuellesFach();
   const t = eTyp.value;
@@ -1447,7 +1461,7 @@ $("#bEintragSpeichern").onclick = () => {
     const slot = eStunde.value === "" ? null : +eStunde.value;
     if(ereignisId) sonder = sonder.filter(x => x.id !== ereignisId);
     else if(slot !== null) sonder = sonder.filter(x => !(x.datum === datum && x.slot === slot));
-    if(titel) sonder.push({id:neueId(), datum, slot, art:ereignisArt, titel,
+    if(titel) sonder.push({id:createId(), datum, slot, art:ereignisArt, titel,
                            raum:eOrt.value.trim(), notiz:eNotiz.value.trim(), geloescht:false});
     sichern(); dlgEintrag.close(); zeichne(); return;
   }
@@ -1460,7 +1474,7 @@ $("#bEintragSpeichern").onclick = () => {
     const nd = {fach, art:eNArt.value, wert, datum, titel:eText.value.trim(), notiz:eNotiz.value.trim()};
     const alteNote = noteId && noten.find(x => x.id === noteId);
     if(alteNote) Object.assign(alteNote, nd);
-    else noten.push(Object.assign({id:neueId(), geloescht:false}, nd));
+    else noten.push(Object.assign({id:createId(), geloescht:false}, nd));
     sichern(); dlgEintrag.close(); zeichne(); return;
   }
   if(!fach && t === "M") return alert("Bitte ein Fach wählen.");
@@ -1476,7 +1490,7 @@ $("#bEintragSpeichern").onclick = () => {
   }
   const alter = bearbeiteId && eintraege.find(x => x.id === bearbeiteId);
   if(alter) Object.assign(alter, daten);
-  else eintraege.push(Object.assign({id:neueId(), erledigt:false, geloescht:false}, daten));
+  else eintraege.push(Object.assign({id:createId(), erledigt:false, geloescht:false}, daten));
   sichern(); dlgEintrag.close(); zeichne();
 };
 $("#bEintragWeg").onclick = () => {
@@ -1742,8 +1756,8 @@ $("#pGitter").onclick = e => {
   if(e.target.closest("#kachelNeu")){
     const name = prompt("Name des neuen Profils", "Profil " + (profile.length+1));
     if(!name || !name.trim()) return;
-    const id = neueId();
-    profile.push({id, name:name.trim()}); profilId = id; profileSichern();
+    const id = createId();
+    profile.push({id, name:name.trim()}); profilId = id; saveProfiles();
     zustandLaden(); normalisiere(); sichern();
     profilVerwalten = false; profilKnopf(); ansicht = "tag";
     profilAuswahlSchliessen(); zeichne(); return;
@@ -1752,7 +1766,7 @@ $("#pGitter").onclick = e => {
   if(u){
     const x = profile.find(y => y.id === u.dataset.umbenennen);
     const name = prompt("Neuer Name", x.name);
-    if(name && name.trim()){ x.name = name.trim(); profileSichern(); zeichneProfilAuswahl(); profilKnopf(); }
+    if(name && name.trim()){ x.name = name.trim(); saveProfiles(); zeichneProfilAuswahl(); profilKnopf(); }
     return;
   }
   const d = e.target.closest("[data-profilweg]");
@@ -1762,11 +1776,11 @@ $("#pGitter").onclick = e => {
     profilSchluessel(x.id).forEach(k => { try{ localStorage.removeItem(k); }catch(e){} });
     profile = profile.filter(y => y.id !== x.id);
     if(profilId === x.id){ profilId = profile[0].id; zustandLaden(); normalisiere(); }
-    profileSichern(); profilKnopf(); zeichneProfilAuswahl(); zeichne(); return;
+    saveProfiles(); profilKnopf(); zeichneProfilAuswahl(); zeichne(); return;
   }
   const w = e.target.closest("[data-wechsel]");
   if(w && !profilVerwalten){
-    profilId = w.dataset.wechsel; profileSichern();
+    profilId = w.dataset.wechsel; saveProfiles();
     zustandLaden(); normalisiere(); profilKnopf();
     ansicht = "tag"; einSub = null; gewaehlt = new Date();
     profilAuswahlSchliessen(); zeichne();
@@ -1957,7 +1971,7 @@ const alsZahl    = (v, min, max, standard) => {
 const alsDatum   = v => /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : "";
 const alsUhrzeit = v => /^([01]\d|2[0-3]):[0-5]\d$/.test(v) ? v : "";
 const alsKuerzel = v => alsText(v, 20).trim().toUpperCase();
-const alsId      = v => /^[A-Za-z0-9_-]{1,40}$/.test(String(v)) ? String(v) : neueId();
+const alsId      = v => /^[A-Za-z0-9_-]{1,40}$/.test(String(v)) ? String(v) : createId();
 /* Bilder dürfen nur eingebettete Bilddaten sein — ein beliebiger Text stünde
    sonst in einem src-Attribut und könnte daraus ausbrechen. */
 const alsBild = v => (typeof v === "string" && v.length < 4e6
@@ -2200,7 +2214,7 @@ async function jetztSichern(fragen){
         + (fertig.weg ? ` · ${zahl(fertig.weg,"alte Datei","alte Dateien")} entfernt` : ""));
       return true;
     }
-  }catch(e){ zeigeFehler("Ordner: " + ((e && e.message) || e)); return false; }
+  }catch(e){ showError("Ordner: " + ((e && e.message) || e)); return false; }
   herunterladen(sicherungInhalt(), sicherungDateiname(), "application/json");
   sicherungNotiert();
   return true;
@@ -2935,7 +2949,7 @@ $("#sOrdnerWahl").onclick = async () => {
     ordner = gewaehlterOrdner;
     await griffLegen(ordner);
     ordnerStand();
-  }catch(e){ if(e && e.name !== "AbortError") zeigeFehler("Ordner: " + ((e && e.message) || e)); }
+  }catch(e){ if(e && e.name !== "AbortError") showError("Ordner: " + ((e && e.message) || e)); }
 };
 $("#sOrdnerWeg").onclick = async () => {
   ordner = null;
@@ -3092,7 +3106,7 @@ $("#sTeilen").onclick = async () => {
     sicherungNotiert();
   }catch(e){
     if(e && e.name === "AbortError") return;      // abgebrochen ist keine Sicherung
-    zeigeFehler("Teilen fehlgeschlagen: " + ((e && e.message) || e));
+    showError("Teilen fehlgeschlagen: " + ((e && e.message) || e));
   }
 };
 /* Ersetzt sämtliche Profile des Geräts durch die aus der Datei. */
@@ -3116,7 +3130,7 @@ function alleProfileUebernehmen(liste){
      unerreichbarer Ballast im Speicher. */
   vorher.filter(id => !neu.some(x => x.id === id))
     .forEach(id => profilSchluessel(id).forEach(k => { try{ localStorage.removeItem(k); }catch(e){} }));
-  profile = neu; profilId = neu[0].id; profileSichern();
+  profile = neu; profilId = neu[0].id; saveProfiles();
   zustandLaden(); normalisiere(); sichern(); profilKnopf();
   ansicht = "tag"; einSub = null; dlgEinst.close(); zeichne();
 }
@@ -3278,7 +3292,7 @@ function browserPruefen(){
   if(!window.HTMLDialogElement || !HTMLDialogElement.prototype.showModal) fehlt.push("Dialogfenster");
   try{ if(!window.localStorage) fehlt.push("Speicher"); }catch(e){ fehlt.push("Speicher"); }
   if(!fehlt.length) return true;
-  zeigeFehler("Dieser Browser ist zu alt für die App — es fehlt: " + fehlt.join(", ")
+  showError("Dieser Browser ist zu alt für die App — es fehlt: " + fehlt.join(", ")
     + ".\nAuf dem iPhone braucht es iOS 15.4 oder neuer, sonst einen aktuellen "
     + "Chrome, Firefox, Edge oder Safari.");
   return false;
@@ -3305,5 +3319,5 @@ function starten(){
   if(wann === "immer" || (wann === "mehrere" && profile.length > 1)) profilAuswahlZeigen(false);
 }
 try{ starten(); }
-catch(e){ zeigeFehler(e.message, (e.stack||"").split("\n")[1] || ""); }
+catch(e){ showError(e.message, (e.stack||"").split("\n")[1] || ""); }
 if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
