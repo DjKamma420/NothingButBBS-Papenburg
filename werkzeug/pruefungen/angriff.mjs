@@ -38,7 +38,7 @@ for (const sub of [null,"H","K","N","E","G","M","F","archiv"]) {
 await page.evaluate(() => { ansicht="eintraege"; einSub=null; render(); const f=document.getElementById("suchFeld"); f.value="<img"; f.dispatchEvent(new Event("input")); });
 await page.waitForTimeout(120);
 /* Dialoge, die den Payload anzeigen */
-await page.evaluate(() => { try{ fachInfo(0); }catch(e){} });
+await page.evaluate(() => { try{ subjectInfo(0); }catch(e){} });
 await page.waitForTimeout(80);
 await page.evaluate(() => { document.querySelectorAll("dialog").forEach(d=>d.close()); try{ einstellungenOeffnen(); }catch(e){} });
 await page.waitForTimeout(150);

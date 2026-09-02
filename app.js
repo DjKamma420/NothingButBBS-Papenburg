@@ -244,13 +244,13 @@ function montagVon(d){
 }
 const plusTage = (d,n) => { const x = new Date(d); x.setDate(x.getDate()+n); return x; };
 const tagIndex = d => { const wt = d.getDay(); return (wt >= 1 && wt <= 5) ? wt-1 : 5; };
-function kalenderwoche(d){
+function calendarWeek(d){
   const x = new Date(d); x.setHours(0,0,0,0);
   x.setDate(x.getDate() + 3 - ((x.getDay()+6)%7));
   const jan4 = new Date(x.getFullYear(),0,4);
   return 1 + Math.round(((x - jan4)/864e5 - 3 + ((jan4.getDay()+6)%7))/7);
 }
-const wocheFuer = d => !cfg.zweiWochen ? "A" : (kalenderwoche(d) % 2 === 1 ? "A" : "B");
+const wocheFuer = d => !cfg.zweiWochen ? "A" : (calendarWeek(d) % 2 === 1 ? "A" : "B");
 const minuten = s => { const [h,m] = s.split(":").map(Number); return h*60+m; };
 const jetztMin = () => { const n = new Date(); return n.getHours()*60 + n.getMinutes(); };
 
@@ -464,7 +464,7 @@ function zeichneTag(){
   $("#klasseAnzeige").textContent = cfg.klasse || "Stundenplan";
   $("#titel").innerHTML = (idx === 5 ? "Wochenende" : LANG[TAGE[idx]]) +
     ` <span>${zwei(gewaehlt.getDate())}.${zwei(gewaehlt.getMonth()+1)}.</span>`;
-  $("#kwLabel").textContent = "KW " + kalenderwoche(gewaehlt);
+  $("#kwLabel").textContent = "KW " + calendarWeek(gewaehlt);
   $("#abLabel").classList.toggle("hidden", !cfg.zweiWochen);
   $("#abLabel").textContent = woche;
   $("#countdown").textContent = countdownText();
@@ -1119,7 +1119,7 @@ let offenerBlock = 0, langDruck = false, fachInfoFach = null;
     uhr = setTimeout(() => {
       langDruck = true;
       if(navigator.vibrate) navigator.vibrate(15);
-      fachInfo(i);
+      subjectInfo(i);
     }, 500);
   };
   const stopp = () => { clearTimeout(uhr); uhr = null; };
@@ -1127,7 +1127,7 @@ let offenerBlock = 0, langDruck = false, fachInfoFach = null;
   ["touchmove","touchend","touchcancel"].forEach(t => flaeche.addEventListener(t, stopp, {passive:true}));
   flaeche.addEventListener("contextmenu", e => {
     const b = e.target.closest("[data-block]"); if(!b) return;
-    e.preventDefault(); fachInfo(+b.dataset.block);
+    e.preventDefault(); subjectInfo(+b.dataset.block);
   });
 })();
 
@@ -1213,10 +1213,10 @@ $("#bSchnellErsatz").onclick = () => {
   dlgSchnell.close(); eintragOeffnen(null, gewaehlt, "E", "", offenerBlock);
 };
 /* Langes Drücken gibt es mit Tastatur nicht — hier führt derselbe Weg hin. */
-$("#bSchnellInfo").onclick = () => { dlgSchnell.close(); fachInfo(offenerBlock); };
+$("#bSchnellInfo").onclick = () => { dlgSchnell.close(); subjectInfo(offenerBlock); };
 
 /** Alles, was die App über ein Fach weiß. */
-function fachInfo(i){
+function subjectInfo(i){
   const f = plan[wocheFuer(gewaehlt)][TAGE[tagIndex(gewaehlt)]][i];
   if(!f) return;
   const k = f.fach.toUpperCase();
@@ -1277,14 +1277,14 @@ eFach.onchange = () => {
   if(!$("#eDatumWahl").classList.contains("hidden")) zeichneDatumWahl();
 };
 eFachFrei.oninput = () => { if(!$("#eDatumWahl").classList.contains("hidden")) zeichneDatumWahl(); };
-eTyp.onchange = artUmschalten;
+eTyp.onchange = toggleType;
 
 function stundenAuswahlFuellen(slot){
   eStunde.innerHTML = `<option value="">ganzer Tag</option>` +
     cfg.slots.map((s,i) => `<option value="${i}" ${i === slot ? "selected" : ""}>${stdText(s)} · ${esc(s.von)}</option>`).join("");
   if(slot === null || slot === undefined) eStunde.value = "";
 }
-function artUmschalten(){
+function toggleType(){
   const t = eTyp.value;
   const ev = t === "E", note = t === "G", merk = t === "M", fehl = t === "F";
   $("#eFachWrap").classList.toggle("hidden", ev || fehl);
@@ -1303,7 +1303,7 @@ function artUmschalten(){
 
 /* --- Datumsauswahl mit Punkten an den Tagen des gewählten Fachs --- */
 let eMonat = new Date();
-function datumFeldText(){
+function dateFieldText(){
   const v = eDatum.value;
   $("#eDatumFeld").textContent = v
     ? new Date(v+"T12:00").toLocaleDateString("de-DE",{weekday:"short",day:"2-digit",month:"2-digit",year:"numeric"})
@@ -1336,7 +1336,7 @@ $("#eMonatMinus").onclick = () => { eMonat = new Date(eMonat.getFullYear(), eMon
 $("#eMonatPlus").onclick  = () => { eMonat = new Date(eMonat.getFullYear(), eMonat.getMonth()+1, 1); zeichneDatumWahl(); };
 $("#eGitter").onclick = e => {
   const b = e.target.closest("[data-wahl]"); if(!b) return;
-  eDatum.value = b.dataset.wahl; datumFeldText(); datumWahlOeffnen(false);
+  eDatum.value = b.dataset.wahl; dateFieldText(); datumWahlOeffnen(false);
 };
 
 /* --- Bilder: verkleinern, sonst platzt der Browserspeicher --- */
@@ -1405,7 +1405,7 @@ function eintragOeffnen(e, datum, typ, fach, slot, extra){
   stundenAuswahlFuellen(vorhanden ? vorhanden.slot : (slot === undefined ? null : slot));
   /* Nie ein Fach vorbelegen, außer es kommt eindeutig aus der angetippten Stunde. */
   fachAuswahlFuellen(e ? e.fach : (fach || ""));
-  datumFeldText(); datumWahlOeffnen(false); artUmschalten();
+  dateFieldText(); datumWahlOeffnen(false); toggleType();
   $("#bEintragWeg").classList.toggle("hidden", !(e || vorhanden));
   saveLockOff();
   dlgEintrag.showModal();
@@ -1419,7 +1419,7 @@ function ereignisOeffnen(id){
   eText.value = o.titel; eNotiz.value = o.notiz || ""; eOrt.value = o.raum || "";
   stundenAuswahlFuellen(o.slot);
   fachAuswahlFuellen("");
-  datumFeldText(); datumWahlOeffnen(false); artUmschalten();
+  dateFieldText(); datumWahlOeffnen(false); toggleType();
   $("#bEintragWeg").classList.remove("hidden");
   saveLockOff();
   dlgEintrag.showModal();
@@ -1432,7 +1432,7 @@ function noteOeffnen(n){
   eText.value = n.titel || ""; eNotiz.value = n.notiz || "";
   eWert.value = String(n.wert).replace(".", ","); eNArt.value = n.art;
   fachAuswahlFuellen(n.fach);
-  datumFeldText(); datumWahlOeffnen(false); artUmschalten();
+  dateFieldText(); datumWahlOeffnen(false); toggleType();
   $("#bEintragWeg").classList.remove("hidden");
   saveLockOff();
   dlgEintrag.showModal();
@@ -1518,7 +1518,7 @@ $("#bSchauBearbeiten").onclick = () => {
 };
 
 /* --- Listenklicks --- */
-function listenKlick(e){
+function listClick(e){
   const hak = e.target.closest("[data-hak]");
   if(hak){
     const it = eintraege.find(x => x.id === hak.dataset.hak);
@@ -1537,7 +1537,7 @@ function listenKlick(e){
   const bea = e.target.closest("[data-bearbeite]");
   if(bea) eintragOeffnen(eintraege.find(x => x.id === bea.dataset.bearbeite));
 }
-["#tagListe","#kalListe","#einListe","#suchListe"].forEach(s => $(s).onclick = listenKlick);
+["#tagListe","#kalListe","#einListe","#suchListe"].forEach(s => $(s).onclick = listClick);
 $("#einListe").addEventListener("click", e => {
   const zurueck = e.target.closest("[data-zurueck]");
   if(zurueck){
@@ -2167,7 +2167,7 @@ const sicherungInhalt = () => profile.length > 1 ? sicherungAlleText() : sicheru
 /* Erkennt die eigenen Sicherungen am Namen. Alles andere im Ordner bleibt
    unangetastet — dort liegen womöglich fremde Dateien. */
 const SICHERUNGSNAME = /^stundenplan-.+-(\d{4}-\d{2}-\d{2})\.json$/;
-function haltegrenze(){
+function stopLimit(){
   const monate = Math.max(0, Number(cfg.sicherHalten) || 0);
   if(!monate) return null;
   const d = new Date(); d.setMonth(d.getMonth() - monate);
@@ -2186,7 +2186,7 @@ async function ordnerSicherungen(){
 }
 /** Löscht die eigenen Sicherungen, die älter sind als die Haltefrist. */
 async function ordnerAufraeumen(){
-  const grenze = haltegrenze();
+  const grenze = stopLimit();
   if(!grenze) return 0;
   let weg = 0;
   for(const s of await ordnerSicherungen())
@@ -2319,7 +2319,7 @@ MA, B006 (SCHM)</pre>
   <p>Passt das Format deiner Schule gar nicht: Der Ausdruck steht in
    <code>app.js</code> in der Funktion <code>parseZelle</code>.</p>`},
 
-{id:"abwoche", teil:"Der Stundenplan", titel:"A- und B-Wochen", worte:"wechselwoche gerade ungerade kalenderwoche",
+{id:"abwoche", teil:"Der Stundenplan", titel:"A- und B-Wochen", worte:"wechselwoche gerade ungerade calendarWeek",
  text:`<p>Feste Regel: <b>ungerade Kalenderwoche = A, gerade = B.</b> Welche gerade
    läuft, steht oben neben der Kalenderwoche und in den Einstellungen.</p>
   <p>Passt es bei deiner Schule andersherum, trag deine A-Woche einfach als
@@ -2640,7 +2640,7 @@ MA = Mathematik</pre>
   <p>Es gibt keine Zugangsdaten, keine Schlüssel und keine Anmeldung — also auch
    nichts, was gestohlen werden könnte.</p>`},
 
-{id:"kalenderwoche", teil:"Technik: wie es funktioniert", titel:"Datum, Kalenderwoche, A/B", worte:"zeitzone iso woche berechnung",
+{id:"calendarWeek", teil:"Technik: wie es funktioniert", titel:"Datum, Kalenderwoche, A/B", worte:"zeitzone iso woche berechnung",
  text:`<p>Datumsangaben werden als <code>JJJJ-MM-TT</code> geführt und stets als
    <b>lokale Zeit</b> gelesen. Der naheliegende Weg über die eingebaute
    ISO-Umwandlung würde die Zeitzone verschieben und je nach Uhrzeit den Vortag
@@ -2933,7 +2933,7 @@ async function ordnerStand(){
   if(frei){
     try{
       const liste = await ordnerSicherungen();
-      const grenze = haltegrenze();
+      const grenze = stopLimit();
       const alt = grenze ? liste.filter(x => x.datum < grenze).length : 0;
       zusatz = ` · ${zahl(liste.length,"Sicherung","Sicherungen")} darin`
         + (alt ? `, ${alt} davon älter als die Haltefrist` : "");
@@ -2996,7 +2996,7 @@ function einstellungenOeffnen(){
   $("#sOrdnerGehtNicht").classList.toggle("hidden", ordnerMoeglich());
   if(ordnerMoeglich()) ordnerLaden().then(ordnerStand);
   sDaten.value = sicherungsText();
-  $("#ankerJetzt").textContent = `Diese Woche ist KW ${kalenderwoche(new Date())}, also ${kalenderwoche(new Date())%2===1?"A":"B"}.`;
+  $("#ankerJetzt").textContent = `Diese Woche ist KW ${calendarWeek(new Date())}, also ${calendarWeek(new Date())%2===1?"A":"B"}.`;
   $("#ankerWrap").classList.toggle("hidden", !cfg.zweiWochen);
   $("#sWocheKopieren").classList.toggle("hidden", !cfg.zweiWochen);
   $("#sWocheStand").textContent = "";
@@ -3212,7 +3212,7 @@ $("#bEinstSpeichern").onclick = () => {
    Version — einzige Quelle ist sw.js
    ===================================================================== */
 let BUILD = "…";
-async function laufendeVersion(){
+async function currentVersion(){
   if(!("serviceWorker" in navigator)) return null;
   const reg = await mitZeitgrenze(navigator.serviceWorker.ready, 2000);
   const sw = reg && (reg.active || navigator.serviceWorker.controller);
@@ -3233,7 +3233,7 @@ async function serverVersion(){
   }catch(e){ return null; }
 }
 async function versionPruefen(){
-  const [laeuft, server] = await Promise.all([laufendeVersion(), serverVersion()]);
+  const [laeuft, server] = await Promise.all([currentVersion(), serverVersion()]);
   BUILD = laeuft || server || "—";
   const veraltet = laeuft && server && laeuft !== server;
   const w = $("#wischText");
