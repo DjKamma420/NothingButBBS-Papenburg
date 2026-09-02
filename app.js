@@ -421,7 +421,7 @@ const oktette = t => new TextEncoder().encode(t).length;
 const mitZeitgrenze = (v,ms) => Promise.race([v, new Promise(r => setTimeout(() => r(null), ms))]);
 
 /* --- Darstellung anwenden --- */
-function themaAnwenden(){
+function applyTheme(){
   document.documentElement.style.setProperty("--akzent", cfg.akzent || "#e5382b");
   document.body.classList.toggle("hell", cfg.modus === "hell");
   document.body.classList.remove("schrift-mono","schrift-serif");
@@ -436,7 +436,7 @@ function themaAnwenden(){
    ===================================================================== */
 function render(){
   normalize();
-  themaAnwenden();
+  applyTheme();
   $("#ansichtTag").classList.toggle("hidden", ansicht !== "tag");
   $("#ansichtKal").classList.toggle("hidden", ansicht !== "kalender");
   $("#ansichtEin").classList.toggle("hidden", ansicht !== "eintraege");
@@ -546,7 +546,7 @@ function renderDay(){
     $("#plan").innerHTML = teile.join("");
   }
   renderProgress();
-  sicherungBanner();
+  backupBanner();
   renderList("#tagListe", "#tagNix", eintraegeAm(gewaehlt));
 }
 
@@ -556,26 +556,26 @@ function renderDay(){
 /* Wann zuletzt gesichert wurde, ist eine Frage des Geräts, nicht des
    Profils — eine Sicherung über alle Profile gilt für alle. Der ältere
    Eintrag im Profil zählt weiter mit, damit v32-Stände nicht verlorengehen. */
-function sicherungDatum(){
+function backupDate(){
   let geraet = "";
   try{ geraet = localStorage.getItem("sicherungZuletzt") || ""; }catch(e){}
   const imProfil = cfg.letzteSicherung || "";
   return geraet > imProfil ? geraet : imProfil;
 }
 const sicherungAlter = () => {
-  const l = sicherungDatum();
+  const l = backupDate();
   return l ? Math.round((new Date() - new Date(l+"T12:00"))/864e5) : null;
 };
 const hatEchteDaten = () => !!(eintraege.length || noten.length || subjects().length);
-function sicherungFaellig(){
+function backupDue(){
   const tage = Math.max(0, Number(cfg.sicherTage) || 0);
   if(!tage || !hatEchteDaten()) return false;
   const alter = sicherungAlter();
   return alter === null || alter >= tage;
 }
-function sicherungBanner(){
+function backupBanner(){
   const b = $("#sicherBanner");
-  const zeigen = sicherungFaellig() && Speicher.lies("sicherSpaeter", "") !== iso(new Date());
+  const zeigen = backupDue() && Speicher.lies("sicherSpaeter", "") !== iso(new Date());
   b.classList.toggle("hidden", !zeigen);
   if(!zeigen) return;
   const alter = sicherungAlter();
@@ -987,7 +987,7 @@ $("#gitter").onclick = e => {
 };
 
 /* Wischen: eine Geste, mehrere Orte */
-function wischen(el, beiWisch){
+function swipe(el, beiWisch){
   if(!el) return;
   let x0 = null, y0 = null;
   el.addEventListener("touchstart", e => {
@@ -1002,16 +1002,16 @@ function wischen(el, beiWisch){
     beiWisch(dx < 0 ? 1 : -1);
   }, {passive:true});
 }
-wischen($("#ansichtTag"), r => { gewaehlt = plusTage(gewaehlt, r); render(); });
-wischen($("#ansichtKal"), r => { kalMonat = new Date(kalMonat.getFullYear(), kalMonat.getMonth()+r, 1); render(); });
-wischen($("#ansichtEin"), () => { if(einSub !== null){ einSub = null; render(); } });
+swipe($("#ansichtTag"), r => { gewaehlt = plusTage(gewaehlt, r); render(); });
+swipe($("#ansichtKal"), r => { kalMonat = new Date(kalMonat.getFullYear(), kalMonat.getMonth()+r, 1); render(); });
+swipe($("#ansichtEin"), () => { if(einSub !== null){ einSub = null; render(); } });
 const ansichtWisch = r => {
   if(ansicht === "eintraege" && einSub !== null){ einSub = null; render(); return; }
   const i = ANSICHTEN.indexOf(ansicht);
   showView(ANSICHTEN[(i + r + ANSICHTEN.length) % ANSICHTEN.length]);
 };
-wischen($("#fuss"), ansichtWisch);
-wischen($("#leerraum"), ansichtWisch);
+swipe($("#fuss"), ansichtWisch);
+swipe($("#leerraum"), ansichtWisch);
 $("#wischPunkte").onclick = () => {
   if(ansicht === "eintraege" && einSub !== null){ einSub = null; render(); return; }
   const i = ANSICHTEN.indexOf(ansicht);
@@ -1073,11 +1073,11 @@ $("#bKmHA").onclick      = () => kalMenu("H");
 $("#bKmKlausur").onclick = () => kalMenu("K");
 $("#bKmNotiz").onclick   = () => kalMenu("N");
 $("#bKmFehl").onclick    = () => kalMenu("F");
-$("#bKmFrei").onclick    = () => { dlgKalTag.close(); tagFreiOeffnen(kalMenuDatum); };
+$("#bKmFrei").onclick    = () => { dlgKalTag.close(); openDayOff(kalMenuDatum); };
 $("#bKmAb").onclick      = () => dlgKalTag.close();
 
 let tagFreiDatum = null;
-function tagFreiOeffnen(datum){
+function openDayOff(datum){
   tagFreiDatum = datum;
   const vorhanden = ferien.find(f => f.typ === "eigen" && datum >= f.von && datum <= f.bis);
   $("#tfDatum").textContent = zeigDatum(datum);
@@ -1103,7 +1103,7 @@ $("#bTagFreiWeg").onclick = () => {
 /* Dialoge: Tippen auf den Hintergrund schließt */
 document.querySelectorAll("dialog").forEach(d => {
   d.addEventListener("click", e => { if(e.target === d) d.close(); });
-  wischen(d, () => d.close());
+  swipe(d, () => d.close());
 });
 
 /* =====================================================================
@@ -1142,7 +1142,7 @@ $("#plan").onclick = e => {
   if(bearbeiten){ blockDialog(); return; }
   const o = sonderAn(gewaehlt, offenerBlock);
   if(o){ openEventDialog(o.id); return; }
-  schnellDialog();
+  quickDialog();
 };
 
 function blockDialog(){
@@ -1173,7 +1173,7 @@ const schnellFach = () => {
   const f = plan[wocheFuer(gewaehlt)][TAGE[tagIndex(gewaehlt)]][offenerBlock];
   return f ? f.fach : "";
 };
-function schnellDialog(){
+function quickDialog(){
   const fach = schnellFach();
   if(!fach){ openEntryDialog(null, gewaehlt, "E", "", offenerBlock); return; }
   const s = cfg.slots[offenerBlock];
@@ -1279,7 +1279,7 @@ eFach.onchange = () => {
 eFachFrei.oninput = () => { if(!$("#eDatumWahl").classList.contains("hidden")) renderDatePicker(); };
 eTyp.onchange = toggleType;
 
-function stundenAuswahlFuellen(slot){
+function fillPeriodSelect(slot){
   eStunde.innerHTML = `<option value="">ganzer Tag</option>` +
     cfg.slots.map((s,i) => `<option value="${i}" ${i === slot ? "selected" : ""}>${stdText(s)} · ${esc(s.von)}</option>`).join("");
   if(slot === null || slot === undefined) eStunde.value = "";
@@ -1402,7 +1402,7 @@ function openEntryDialog(e, datum, typ, fach, slot, extra){
   if(e && e.typ === "F"){ eFehlArt.value = e.titel || "entschuldigt"; eFehlStd.value = Number(e.stunden)||1; }
   if(!e && typ === "F" && extra && extra.stunden) eFehlStd.value = extra.stunden;
   if(vorhanden) eOrt.value = vorhanden.raum || "";
-  stundenAuswahlFuellen(vorhanden ? vorhanden.slot : (slot === undefined ? null : slot));
+  fillPeriodSelect(vorhanden ? vorhanden.slot : (slot === undefined ? null : slot));
   /* Nie ein Fach vorbelegen, außer es kommt eindeutig aus der angetippten Stunde. */
   fillSubjectSelect(e ? e.fach : (fach || ""));
   dateFieldText(); openDatePicker(false); toggleType();
@@ -1417,7 +1417,7 @@ function openEventDialog(id){
   $("#dlgEintragTitel").textContent = "Ereignis ändern";
   eTyp.value = "E"; eDatum.value = o.datum;
   eText.value = o.titel; eNotiz.value = o.notiz || ""; eOrt.value = o.raum || "";
-  stundenAuswahlFuellen(o.slot);
+  fillPeriodSelect(o.slot);
   fillSubjectSelect("");
   dateFieldText(); openDatePicker(false); toggleType();
   $("#bEintragWeg").classList.remove("hidden");
@@ -1503,7 +1503,7 @@ $("#bEintragWeg").onclick = () => {
 
 /* --- Merkblatt ansehen --- */
 let schauId = null;
-function schauOeffnen(id){
+function openPreview(id){
   const e = eintraege.find(x => x.id === id); if(!e) return;
   schauId = id;
   $("#schauTitel").textContent = e.titel || "Merkblatt";
@@ -1527,7 +1527,7 @@ function listClick(e){
     persistState(); render(); return;
   }
   const schau = e.target.closest("[data-schau]");
-  if(schau){ schauOeffnen(schau.dataset.schau); return; }
+  if(schau){ openPreview(schau.dataset.schau); return; }
   const ereignis = e.target.closest("[data-ereignis]");
   if(ereignis){ openEventDialog(ereignis.dataset.ereignis); return; }
   const anteil = e.target.closest("[data-anteil]");
@@ -1608,7 +1608,7 @@ function sharePreview(){
     + (hatEigenenAnteil(anteilFach) ? "" : " Zurzeit gilt der Standard.");
 }
 anWert.oninput = sharePreview;
-function zielRechnen(){
+function calculateGoal(){
   const ziel = parseFloat(String(anZiel.value).replace(",", "."));
   const feld = $("#anZielErgebnis");
   if(isNaN(ziel)){ feld.textContent = ""; return; }
@@ -1634,7 +1634,7 @@ function zielRechnen(){
     ? `Die nächste ${art === "m" ? "mündliche" : "schriftliche"} Note müsste ${notenText(noetig)} sein.`
     : `Mit einer einzelnen Note nicht erreichbar (rechnerisch ${notenText(noetig)}).`;
 }
-anZiel.oninput = zielRechnen; anZielArt.onchange = zielRechnen;
+anZiel.oninput = calculateGoal; anZielArt.onchange = calculateGoal;
 $("#bAnStandard").onclick = () => {
   if(cfg.anteile) delete cfg.anteile[anteilFach];
   persistState(); dlgAnteil.close(); render();
@@ -1656,7 +1656,7 @@ function parseCell(t){
   return {fach:fach.trim(), raum:raum.trim(),
           lk: klammer === "(" ? rest.trim() : "", klasse: klammer === "[" ? rest.trim() : ""};
 }
-function textLesen(text){
+function readText(text){
   const zeilen = text.split("\n").map(z => z.trim()).filter(z => z && z !== "-");
   const proStunde = {}; let std = null;
   for(const z of zeilen){
@@ -1697,7 +1697,7 @@ function openImport(){
 }
 iTag.onchange = importLaden; iWoche.onchange = importLaden;
 $("#bImportText").onclick = () => {
-  const proStunde = textLesen(iText.value);
+  const proStunde = readText(iText.value);
   const werte = cfg.slots.map(sl => {
     const z = sl.std.split(",").map(x => proStunde[x.trim()]).find(Boolean);
     return z ? {fach:z.fach, raum:z.raum, lk:z.lk || z.klasse} : {};
@@ -1987,7 +1987,7 @@ function sanitizePairs(o){
 }
 /* „Std." benennt Stundennummern. Mehr als Ziffern, Komma und Schrägstrich
    braucht das Feld nicht — und mehr darf auch nicht hinein. */
-function slotsSaeubern(l){
+function sanitizeSlots(l){
   const raus = (Array.isArray(l) ? l : []).slice(0, 24).map(s => ({
     std: alsText(s && s.std, 20).replace(/[^0-9,\/ ]/g, "").trim(),
     von: alsUhrzeit(s && s.von), bis: alsUhrzeit(s && s.bis)
@@ -1997,7 +1997,7 @@ function slotsSaeubern(l){
 function sanitizeConfig(roh){
   const c = Object.assign({}, STANDARD, (roh && typeof roh === "object") ? roh : {});
   c.klasse      = alsText(c.klasse, 40);
-  c.slots       = slotsSaeubern(c.slots);
+  c.slots       = sanitizeSlots(c.slots);
   c.zweiWochen  = !!c.zweiWochen;
   c.land        = LAENDER[c.land] ? c.land : "";
   c.notenSystem = c.notenSystem === "punkte15" ? "punkte15" : "note6";
@@ -2071,7 +2071,7 @@ function sanitizeFree(f){
   return {von, bis: bis >= von ? bis : von, name: alsText(f.name, 80) || "Frei",
           typ: ["ferien","feiertag","eigen"].includes(f.typ) ? f.typ : "eigen"};
 }
-function sonderSaeubern(o){
+function sanitizeSpecial(o){
   if(!o || typeof o !== "object") return null;
   const datum = alsDatum(o.datum); if(!datum) return null;
   return {id:alsId(o.id), datum,
@@ -2099,7 +2099,7 @@ function sanitizePackage(d){
   if(d.plan && typeof d.plan === "object") p.plan = sanitizePlan(d.plan);
   if(Array.isArray(d.eintraege)) p.eintraege = d.eintraege.slice(0,5000).map(sanitizeEntry).filter(Boolean);
   if(Array.isArray(d.ferien))    p.ferien    = d.ferien.slice(0,2000).map(sanitizeFree).filter(Boolean);
-  if(Array.isArray(d.sonder))    p.sonder    = d.sonder.slice(0,5000).map(sonderSaeubern).filter(Boolean);
+  if(Array.isArray(d.sonder))    p.sonder    = d.sonder.slice(0,5000).map(sanitizeSpecial).filter(Boolean);
   if(Array.isArray(d.noten))     p.noten     = d.noten.slice(0,5000).map(sanitizeGrade).filter(Boolean);
   return p;
 }
@@ -2163,7 +2163,7 @@ const sicherungDateiname = () => {
   const alle = profile.length > 1;
   return `stundenplan-${alle ? "alle" : dateiName()}-${iso(new Date())}.json`;
 };
-const sicherungInhalt = () => profile.length > 1 ? sicherungAlleText() : sicherungsText();
+const sicherungInhalt = () => profile.length > 1 ? allBackupText() : sicherungsText();
 /* Erkennt die eigenen Sicherungen am Namen. Alles andere im Ordner bleibt
    unangetastet — dort liegen womöglich fremde Dateien. */
 const SICHERUNGSNAME = /^stundenplan-.+-(\d{4}-\d{2}-\d{2})\.json$/;
@@ -2202,7 +2202,7 @@ async function saveToFolder(fragen){
   await strom.write(sicherungInhalt());
   await strom.close();
   const weg = await cleanupFolder();
-  sicherungNotiert();
+  backupNoted();
   return {name, weg};
 }
 /** Erst den Ordner versuchen, sonst herunterladen. Immer eine echte Sicherung. */
@@ -2216,13 +2216,13 @@ async function saveNow(fragen){
     }
   }catch(e){ showError("Ordner: " + ((e && e.message) || e)); return false; }
   downloadFile(sicherungInhalt(), sicherungDateiname(), "application/json");
-  sicherungNotiert();
+  backupNoted();
   return true;
 }
 /* Beim Öffnen von selbst sichern. Ohne erteilte Berechtigung wird nicht
    gefragt — dann übernimmt das Banner, wo ein Antippen die Frage erlaubt. */
 async function autoBackup(){
-  if(!cfg.sicherAuto || !sicherungFaellig()) return;
+  if(!cfg.sicherAuto || !backupDue()) return;
   await loadFolder();
   try{
     const fertig = await saveToFolder(false);
@@ -2337,7 +2337,7 @@ MA = Mathematik</pre>
   <p>Der Plan zeigt weiter die Kürzel — sonst passt er nicht auf den Bildschirm.
    Die vollen Namen erscheinen in der Fach-Info, im Zeugnis und in der Suche:
    Wer „Chemie“ sucht, findet auch Einträge, die nur „CH“ tragen.</p>`},
-{id:"reiter", teil:"Täglich benutzen", titel:"Die vier Reiter", worte:"navigation wischen ansicht tag kalender einträge zeugnis",
+{id:"reiter", teil:"Täglich benutzen", titel:"Die vier Reiter", worte:"navigation swipe ansicht tag kalender einträge zeugnis",
  text:`<table class="hTab">
    <tr><th>Reiter</th><th>Inhalt</th></tr>
    <tr><td><b>Tag</b></td><td>Plan des Tages mit Uhrzeiten, laufender Stunde, Fortschrittsbalken</td></tr>
@@ -2777,7 +2777,7 @@ $("#hilfeVerzeichnis").onclick = e => {
 /* =====================================================================
    Einstellungen
    ===================================================================== */
-function slotEditorZeichnen(slots){
+function renderSlotEditor(slots){
   $("#slotEditor").innerHTML = slots.map((s,i) => `<div class="slot" data-slot="${i}">
     <input type="text" value="${esc(s.std)}" data-feld="std" inputmode="numeric">
     <input type="time" value="${s.von}" data-feld="von">
@@ -2790,7 +2790,7 @@ const slotsAuslesen = () => [...document.querySelectorAll("#slotEditor .slot")].
   bis:z.querySelector('[data-feld=bis]').value
 })).filter(s => s.std && s.von && s.bis);
 const paareText = obj => Object.entries(obj||{}).map(([k,v]) => `${k} = ${v}`).join("\n");
-function textPaare(t){
+function textPairs(t){
   const o = {};
   String(t||"").split("\n").forEach(z => {
     const m = z.match(/^\s*([^=]+?)\s*=\s*(.+?)\s*$/);
@@ -2799,7 +2799,7 @@ function textPaare(t){
   return o;
 }
 /* Reihenfolge-Listen: einfache Pfeile statt Ziehen — auf dem Handy zuverlässiger. */
-function reiheZeichnen(sel, liste, beschriften){
+function renderRow(sel, liste, beschriften){
   $(sel).innerHTML = liste.map((k,i) => `<div class="reihezeile">
     <span class="rname">${esc(beschriften(k))}</span>
     <button type="button" data-hoch="${i}" ${i === 0 ? "disabled style=opacity:.3" : ""} aria-label="nach oben">↑</button>
@@ -2807,11 +2807,11 @@ function reiheZeichnen(sel, liste, beschriften){
   </div>`).join("");
 }
 let reiheEinListe = [], reiheFachListe = [];
-function reihenZeichnen(){
-  reiheZeichnen("#sReiheEin", reiheEinListe, k => ARTLANG[k] || k);
-  reiheZeichnen("#sReiheFach", reiheFachListe, fachName);
+function renderRows(){
+  renderRow("#sReiheEin", reiheEinListe, k => ARTLANG[k] || k);
+  renderRow("#sReiheFach", reiheFachListe, fachName);
 }
-function reiheSchieben(liste, i, r){
+function shiftRow(liste, i, r){
   const j = i + r;
   if(j < 0 || j >= liste.length) return liste;
   [liste[i], liste[j]] = [liste[j], liste[i]];
@@ -2819,17 +2819,17 @@ function reiheSchieben(liste, i, r){
 }
 $("#sReiheEin").onclick = e => {
   const h = e.target.closest("[data-hoch]"), r = e.target.closest("[data-runter]");
-  if(h) reiheEinListe = reiheSchieben(reiheEinListe, +h.dataset.hoch, -1);
-  else if(r) reiheEinListe = reiheSchieben(reiheEinListe, +r.dataset.runter, 1);
+  if(h) reiheEinListe = shiftRow(reiheEinListe, +h.dataset.hoch, -1);
+  else if(r) reiheEinListe = shiftRow(reiheEinListe, +r.dataset.runter, 1);
   else return;
-  reihenZeichnen();
+  renderRows();
 };
 $("#sReiheFach").onclick = e => {
   const h = e.target.closest("[data-hoch]"), r = e.target.closest("[data-runter]");
-  if(h) reiheFachListe = reiheSchieben(reiheFachListe, +h.dataset.hoch, -1);
-  else if(r) reiheFachListe = reiheSchieben(reiheFachListe, +r.dataset.runter, 1);
+  if(h) reiheFachListe = shiftRow(reiheFachListe, +h.dataset.hoch, -1);
+  else if(r) reiheFachListe = shiftRow(reiheFachListe, +r.dataset.runter, 1);
   else return;
-  reihenZeichnen();
+  renderRows();
 };
 
 function renderSubjectShares(){
@@ -2872,7 +2872,7 @@ const speicherWarnung = () => {
   return a >= 80 ? `Der Speicher ist zu ${a} % voll. Lege eine Sicherung an und `
     + `entferne alte Bilder aus Merkblättern, sonst gehen neue Einträge verloren.` : "";
 };
-function speicherStand(){
+function storageStatus(){
   const kb = usedKb(), warn = speicherWarnung();
   const bilderZahl = eintraege.reduce((s,e) => s + ((e.bilder||[]).length), 0);
   const el = $("#sSpeicher");
@@ -2880,11 +2880,11 @@ function speicherStand(){
     + `${zahl(bilderZahl,"Bild","Bilder")} in Merkblättern.` + (warn ? " " + warn : "");
   el.style.color = warn ? "var(--akzent)" : "";
 }
-function sicherungStand(){
-  const l = sicherungDatum(), alter = sicherungAlter();
+function backupStatus(){
+  const l = backupDate(), alter = sicherungAlter();
   const el = $("#sSicherStand");
   if(!l){ el.textContent = "Noch nie gesichert. Jetzt wäre ein guter Zeitpunkt."; return; }
-  el.textContent = sicherungFaellig()
+  el.textContent = backupDue()
     ? `Letzte Sicherung vor ${zahl(alter,"Tag","Tagen")} — Zeit für eine neue.`
     : `Letzte Sicherung: ${zeigDatum(l)}${alter ? ` (vor ${zahl(alter,"Tag","Tagen")})` : " (heute)"}.`;
 }
@@ -2964,7 +2964,7 @@ $("#sOrdnerJetzt").onclick = async () => {
 function openSettings(){
   sKlasse.value = cfg.klasse;
   sZweiWochen.checked = cfg.zweiWochen;
-  slotEditorZeichnen(cfg.slots);
+  renderSlotEditor(cfg.slots);
   sFarbe.value = cfg.akzent; sFarbeHex.value = cfg.akzent;
   sModus.value = cfg.modus; sSchrift.value = cfg.schrift;
   sStartProfil.value = cfg.startProfil || "immer";
@@ -2979,7 +2979,7 @@ function openSettings(){
   archiveNoticeSetting();
   reiheEinListe = reiheEin().slice();
   reiheFachListe = subjectOrder().slice();
-  reihenZeichnen();
+  renderRows();
   sMelden.checked = !!cfg.melden; reportStatus();
   sLehrer.value = paareText(cfg.lehrer); sFaecher.value = paareText(cfg.fachnamen);
   sLand.innerHTML = `<option value="">— wählen —</option>` +
@@ -3001,7 +3001,7 @@ function openSettings(){
   $("#sWocheKopieren").classList.toggle("hidden", !cfg.zweiWochen);
   $("#sWocheStand").textContent = "";
   $("#sDateiAlle").classList.toggle("hidden", profile.length < 2);
-  sicherungStand(); speicherStand(); checkVersion();
+  backupStatus(); storageStatus(); checkVersion();
   dlgEinst.showModal();
 }
 $("#btnEinst").onclick = openSettings;
@@ -3023,13 +3023,13 @@ $("#sWocheKopieren").onclick = e => {
 };
 $("#slotEditor").onclick = e => {
   const b = e.target.closest("[data-slotweg]"); if(!b) return;
-  const s = slotsAuslesen(); s.splice(+b.dataset.slotweg,1); slotEditorZeichnen(s);
+  const s = slotsAuslesen(); s.splice(+b.dataset.slotweg,1); renderSlotEditor(s);
 };
 $("#sSlotPlus").onclick = () => {
-  const s = slotsAuslesen(); s.push({std:String(s.length+1), von:"15:30", bis:"16:15"}); slotEditorZeichnen(s);
+  const s = slotsAuslesen(); s.push({std:String(s.length+1), von:"15:30", bis:"16:15"}); renderSlotEditor(s);
 };
 document.querySelectorAll("[data-vorlage]").forEach(b =>
-  b.onclick = () => slotEditorZeichnen(VORLAGEN[b.dataset.vorlage]));
+  b.onclick = () => renderSlotEditor(VORLAGEN[b.dataset.vorlage]));
 $("#sFarbVorlagen").onclick = e => {
   const b = e.target.closest("[data-farbe]"); if(!b) return;
   sFarbe.value = b.dataset.farbe; sFarbeHex.value = b.dataset.farbe; colorPreview();
@@ -3040,8 +3040,8 @@ function colorPreview(){
 }
 sFarbe.oninput = () => { sFarbeHex.value = sFarbe.value; colorPreview(); };
 sFarbeHex.oninput = () => { if(/^#[0-9a-fA-F]{6}$/.test(sFarbeHex.value.trim())) sFarbe.value = sFarbeHex.value.trim(); colorPreview(); };
-sModus.onchange = () => { cfg.modus = sModus.value; themaAnwenden(); };
-sSchrift.onchange = () => { cfg.schrift = sSchrift.value; themaAnwenden(); };
+sModus.onchange = () => { cfg.modus = sModus.value; applyTheme(); };
+sSchrift.onchange = () => { cfg.schrift = sSchrift.value; applyTheme(); };
 
 const dateiName = () => (profilName().replace(/[^A-Za-z0-9äöüÄÖÜß -]/g,"").trim() || "plan")
   .replace(/\s+/g,"-").toLowerCase();
@@ -3050,7 +3050,7 @@ const sicherungsText = () => JSON.stringify(
    cfg, plan, eintraege, ferien, sonder, noten}, null, 2);
 /* Die Sicherung eines Profils enthält nur dieses eine. Wer mehrere führt,
    hätte auf einem neuen Gerät sonst jedes einzeln nachbauen müssen. */
-function sicherungAlleText(){
+function allBackupText(){
   const holen = (id,k) => {
     try{ const v = localStorage.getItem("p"+id+"_"+k); return v ? JSON.parse(v) : null; }
     catch(e){ return null; }
@@ -3064,20 +3064,20 @@ function sicherungAlleText(){
 }
 /* Nur vermerken, wenn die Daten das Gerät wirklich verlassen haben. Ein
    falscher Vermerk verschweigt vier Wochen lang, dass keine Sicherung besteht. */
-function sicherungNotiert(){
+function backupNoted(){
   const heute = iso(new Date());
   cfg.letzteSicherung = heute;
   try{ localStorage.setItem("sicherungZuletzt", heute); }catch(e){}
   Speicher.entferne("sicherSpaeter");      // erledigt ist nicht vertagt
-  persistState(); sicherungStand(); render();
+  persistState(); backupStatus(); render();
 }
 $("#sDatei").onclick = () => {
   downloadFile(sicherungsText(), `stundenplan-${dateiName()}-${iso(new Date())}.json`, "application/json");
-  sicherungNotiert();
+  backupNoted();
 };
 $("#sDateiAlle").onclick = () => {
-  downloadFile(sicherungAlleText(), `stundenplan-alle-${iso(new Date())}.json`, "application/json");
-  sicherungNotiert();
+  downloadFile(allBackupText(), `stundenplan-alle-${iso(new Date())}.json`, "application/json");
+  backupNoted();
 };
 $("#sDateiWahl").onclick = () => sDateiLesen.click();
 sDateiLesen.onchange = () => {
@@ -3088,7 +3088,7 @@ sDateiLesen.onchange = () => {
   leser.readAsText(f); sDateiLesen.value = "";
 };
 $("#sTeilen").onclick = async () => {
-  const text = profile.length > 1 ? sicherungAlleText() : sicherungsText();
+  const text = profile.length > 1 ? allBackupText() : sicherungsText();
   const name = `stundenplan-${profile.length > 1 ? "alle" : dateiName()}-${iso(new Date())}.json`;
   try{
     /* Mit einer leeren Dateiliste antwortet canShare auch dort „nein", wo
@@ -3103,7 +3103,7 @@ $("#sTeilen").onclick = async () => {
     } else {
       downloadFile(text, name, "application/json");
     }
-    sicherungNotiert();
+    backupNoted();
   }catch(e){
     if(e && e.name === "AbortError") return;      // abgebrochen ist keine Sicherung
     showError("Teilen fehlgeschlagen: " + ((e && e.message) || e));
@@ -3192,8 +3192,8 @@ $("#bEinstSpeichern").onclick = () => {
   cfg.notenSystem = sNotenSystem.value;
   cfg.anteilM = Math.max(0, Math.min(100, Number(sAnteilM.value)||0));
   cfg.anteile = readSubjectShares();
-  cfg.lehrer = textPaare(sLehrer.value);
-  cfg.fachnamen = textPaare(sFaecher.value);
+  cfg.lehrer = textPairs(sLehrer.value);
+  cfg.fachnamen = textPairs(sFaecher.value);
   if(/^#[0-9a-fA-F]{6}$/.test(sFarbeHex.value.trim())) cfg.akzent = sFarbeHex.value.trim();
   cfg.modus = sModus.value; cfg.schrift = sSchrift.value;
   cfg.startProfil = sStartProfil.value;
@@ -3258,7 +3258,7 @@ async function checkForUpdate(){
 /* =====================================================================
    Start
    ===================================================================== */
-function startAnsicht(){
+function startView(){
   try{
     const p = new URLSearchParams(location.search);
     const a = p.get("ansicht");
@@ -3304,8 +3304,8 @@ function initApp(){
     cfg.slots = STANDARD.slots.slice();
   }
   checkBrowser();
-  themaAnwenden();
-  startAnsicht();
+  applyTheme();
+  startView();
   normalize();
   profileButton();
   render();
