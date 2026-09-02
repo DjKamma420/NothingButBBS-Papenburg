@@ -10,7 +10,7 @@
  */
 import fs from "node:fs";
 
-const app = fs.readFileSync(new URL("../../app.js", import.meta.url), "utf8");
+const app = fs.readFileSync(new URL("../app.js", import.meta.url), "utf8");
 
 const required = [
   {
