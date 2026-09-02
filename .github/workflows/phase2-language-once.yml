@@ -1,0 +1,56 @@
+name: Phase 2 language integration
+on:
+  push:
+    branches: [feature/sprachumschalter]
+permissions:
+  contents: write
+jobs:
+  integrate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Load language layer
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('index.html')
+          s=p.read_text(encoding='utf-8')
+          marker='<script src="app.js"></script>'
+          if '<script src="sprache.js"></script>' not in s:
+              if marker not in s:
+                  raise SystemExit('app.js script marker not found')
+              s=s.replace(marker, '<script src="sprache.js"></script>\n<script src="app.js"></script>', 1)
+              p.write_text(s, encoding='utf-8')
+          PY
+      - name: Bump service worker version
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('sw.js')
+          s=p.read_text(encoding='utf-8')
+          import re
+          m=re.search(r'(CACHE(?:_NAME)?\s*=\s*[\'\"][^\'\"]*?)(?:-v)?(\d+)([\'\"])',s)
+          if m:
+              n=int(m.group(2))+1
+              s=s[:m.start(2)]+str(n)+s[m.end(2):]
+          else:
+              s=s.replace('const CACHE', 'const CACHE', 1)
+          p.write_text(s, encoding='utf-8')
+          PY
+      - name: Validate
+        run: node werkzeug/pruefen.mjs
+      - name: Commit integration
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html sw.js
+          git diff --cached --quiet && exit 0
+          git commit -m 'feat: load DE/EN language layer'
+          git push
+      - name: Remove one-shot workflow
+        if: success()
+        run: |
+          git rm .github/workflows/phase2-language-once.yml
+          git commit -m 'chore: remove one-shot phase 2 workflow'
+          git push
