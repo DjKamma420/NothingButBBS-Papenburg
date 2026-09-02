@@ -488,3 +488,43 @@ ist ein deutlich größerer Batzen als die Funktionen und kommt als
 eigene, spätere Etappe, nicht mehr heute Nacht. Mache in derselben
 Taktung weiter, bis entweder ChatGPT übernimmt oder mir die Zeit/Tokens
 ausgehen.
+
+### 2026-09-02 18:02 UTC — Claude
+**Meilenstein: Phase 3 (Funktionsnamen) im Wesentlichen fertig, main
+steht bei v54.** 129 von 133 Funktionsbezeichnern in `app.js` sind jetzt
+Englisch (Schritte v43–v54, komplett ohne ChatGPT-Beteiligung, da über
+Stunden keine Aktivität — lieber Fortschritt als Leerlauf). Jeder
+Schritt einzeln committed, mit `node werkzeug/pruefen.mjs` und allen
+sechs Browser-Suiten (100/100) geprüft, `sw.js`-Version jedes Mal
+hochgezählt.
+
+Bewusst NICHT umbenannt, mit Begründung direkt im Code (Kommentar bei
+der jeweiligen Stelle wäre für zukünftige Schritte hilfreich, aktuell
+nur hier notiert):
+- **`melden`** und **`reiheEin`** — beide kommen zusätzlich als
+  `cfg.melden`/`cfg.reiheEin` vor, persistierte Einstellungen mit
+  zufällig gleichem Namen. Umbenennen hätte gespeicherte Nutzerdaten
+  (Local Storage bestehender Installationen) inkompatibel gemacht.
+- **`blockDialog`**, **`countdownText`** — schon rein englisch lesbar,
+  keine Übersetzung nötig.
+
+Drei weitere echte Kollisionen unterwegs gefunden und umschifft (lokale
+`start`-Variable, „herunterladen"/„sichern" als Kommentar-Prosa) —
+insgesamt 5 Fälle, bei denen ein naiver globaler Suchen-Ersetzen-Lauf
+(wie ChatGPTs erster, abgelehnter Codemod-Versuch) etwas kaputt gemacht
+hätte. Jeder Schritt wurde stattdessen einzeln geprüft: Zieldatei-Diff
+angesehen, Kollisionen mit bestehenden Bezeichnern/Property-Keys/
+Kommentar-Prosa vorab gegengecheckt.
+
+**Noch offen für später:** alle Variablen-Bezeichner (`cfg`, `plan`,
+`eintraege`, `noten`, `sonder`, `ferien` usw. — die ganze Begriffsliste
+aus der CLAUDE.md) sind noch Deutsch. Das ist ein deutlich größerer,
+riskanterer Batzen als die Funktionsnamen (diese Variablen sind
+namensgleich mit den localStorage-Schlüsseln über `SCHEMA`/`DATEN`, ein
+Umbenennen im Code allein würde nichts an den gespeicherten Schlüsseln
+ändern — muss also sorgfältig getrennt betrachtet werden, nicht einfach
+genauso wie die Funktionsnamen). Eigene Etappe, nicht heute.
+
+Sprachumschalter (Phase 2) und Sicherheits-/Datenschutzaudit (Phase 1)
+sind bereits erledigt (siehe frühere Einträge). Phase 4
+(Feature-Vorschläge von ChatGPT) liegt noch nicht vor.
