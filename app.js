@@ -300,11 +300,11 @@ function normalize(){
     if(!EREIGNISARTEN.includes(o.art)) o.art = "ereignis";
     if(o.slot !== null && o.slot >= cfg.slots.length) o.slot = null;
   });
-  aufraeumen();
+  cleanup();
 }
 /* Abgehakte Hausaufgaben und Klausuren wandern nach sieben Tagen ins Archiv.
    Notizen, Merkblätter und Fehlzeiten bleiben — die will man behalten. */
-function aufraeumen(){
+function cleanup(){
   const grenze = iso(plusTage(new Date(), -7));
   let bewegt = false;
   eintraege.forEach(e => {
@@ -312,7 +312,7 @@ function aufraeumen(){
        && e.erledigtAm && e.erledigtAm <= grenze){ insArchiv(e); bewegt = true; }
   });
   if(bewegt) Speicher.schreib("eintraege", eintraege);
-  archivAufraeumen();
+  cleanupArchive();
 }
 
 /* Wann etwas im Archiv gelandet ist. Ältere Fassungen haben das nicht
@@ -321,16 +321,16 @@ function aufraeumen(){
 const archiviertAm = x => x.geloeschtAm || iso(new Date());
 const archivFrist = () => Math.max(0, Number(cfg.archivTage) || 0);
 /** Tage bis zur endgültigen Entfernung, oder null bei „für immer". */
-function archivRest(x){
+function archiveRemaining(x){
   const tage = archivFrist();
   if(!tage) return null;
   const alter = Math.round((new Date() - new Date(archiviertAm(x)+"T12:00"))/864e5);
   return tage - alter;
 }
 /* Entfernt endgültig, was die Frist überschritten hat. Bei 0 passiert nichts. */
-function archivAufraeumen(){
+function cleanupArchive(){
   if(!archivFrist()) return;
-  const behalten = x => !x.geloescht || archivRest(x) > 0;
+  const behalten = x => !x.geloescht || archiveRemaining(x) > 0;
   const vorher = eintraege.length + sonder.length + noten.length;
   eintraege = eintraege.filter(behalten);
   sonder    = sonder.filter(behalten);
@@ -349,7 +349,7 @@ function persistState(){
 /* Archivieren und Zurückholen an einer Stelle: ohne geloeschtAm wüsste
    niemand, wann die Aufbewahrungsfrist abläuft. */
 function insArchiv(x){ x.geloescht = true; x.geloeschtAm = iso(new Date()); }
-function ausArchiv(x){ x.geloescht = false; x.geloeschtAm = null; }
+function fromArchive(x){ x.geloescht = false; x.geloeschtAm = null; }
 
 const aktiv        = () => eintraege.filter(e => !e.geloescht);
 const sonderAktiv  = () => sonder.filter(o => !o.geloescht);
@@ -740,21 +740,21 @@ const listeVonTyp = t => {
 const kommendeEreignisse = () => sonderAktiv()
   .filter(o => o.datum >= iso(plusTage(new Date(), -7)))
   .sort((a,b) => a.datum.localeCompare(b.datum) || ((a.slot ?? -1) - (b.slot ?? -1)));
-function archivListe(){
+function archiveList(){
   return [
     ...eintraege.filter(e => e.geloescht).map(e => ({art:"eintrag", id:e.id, marke:e.typ, datum:e.datum,
-      seit:archiviertAm(e), rest:archivRest(e),
+      seit:archiviertAm(e), rest:archiveRemaining(e),
       text:(e.fach ? e.fach+" — " : "") + (e.titel || ART[e.typ] || "")})),
     ...sonder.filter(o => o.geloescht).map(o => ({art:"ereignis", id:o.id, marke:"E", datum:o.datum,
-      seit:archiviertAm(o), rest:archivRest(o), text:o.titel})),
+      seit:archiviertAm(o), rest:archiveRemaining(o), text:o.titel})),
     ...noten.filter(n => n.geloescht).map(n => ({art:"note", id:n.id, marke:"G", datum:n.datum,
-      seit:archiviertAm(n), rest:archivRest(n),
+      seit:archiviertAm(n), rest:archiveRemaining(n),
       text:`${notenText(n.wert)} · ${fachName(n.fach)}${n.titel ? " — "+n.titel : ""}`}))
   ].sort((a,b) => (a.rest === null ? 1e9 : a.rest) - (b.rest === null ? 1e9 : b.rest)
                || b.datum.localeCompare(a.datum));
 }
 /* Was der Hinweis oben im Archiv sagt. */
-function archivHinweis(liste){
+function archiveNotice(liste){
   const tage = archivFrist();
   if(!tage) return "Gelöschtes bleibt hier, bis du es selbst entfernst. "
     + "Eine Frist stellst du unter ⚙ → Archiv ein.";
@@ -784,7 +784,7 @@ function renderEntries(){
       G: notenAktiv().length ? `${notenAktiv().length} eingetragen` : "keine",
       M: listeVonTyp("M").length ? `${listeVonTyp("M").length} vorhanden` : "keine",
       F: std ? `${zahl(std,"Stunde","Stunden")} · ${tageText(std)}` : "keine",
-      archiv: archivListe().length ? `${archivListe().length} im Archiv` : "leer"
+      archiv: archiveList().length ? `${archiveList().length} im Archiv` : "leer"
     };
     Object.entries(zaehler).forEach(([k,v]) => { const el = $("#zahl"+k); if(el) el.textContent = v; });
     search();
@@ -794,9 +794,9 @@ function renderEntries(){
   $("#einTitel").textContent = ARTLANG[einSub] || "";
 
   if(einSub === "archiv"){
-    const liste = archivListe();
+    const liste = archiveList();
     const el = $("#einSubHinweis");
-    el.textContent = archivHinweis(liste);
+    el.textContent = archiveNotice(liste);
     el.style.color = archivFrist() ? "var(--akzent)" : "";
     $("#einListe").innerHTML = liste.map(e => {
       const rest = e.rest === null ? ""
@@ -1531,7 +1531,7 @@ function listClick(e){
   const ereignis = e.target.closest("[data-ereignis]");
   if(ereignis){ ereignisOeffnen(ereignis.dataset.ereignis); return; }
   const anteil = e.target.closest("[data-anteil]");
-  if(anteil){ anteilOeffnen(anteil.dataset.anteil); return; }
+  if(anteil){ openShareDialog(anteil.dataset.anteil); return; }
   const note = e.target.closest("[data-note]");
   if(note){ noteOeffnen(noten.find(n => n.id === note.dataset.note)); return; }
   const bea = e.target.closest("[data-bearbeite]");
@@ -1543,7 +1543,7 @@ $("#einListe").addEventListener("click", e => {
   if(zurueck){
     const [art,id] = zurueck.dataset.zurueck.split(":");
     const it = archivFinden(art,id);
-    if(it){ ausArchiv(it); if(art === "eintrag"){ it.erledigt = false; it.erledigtAm = null; } }
+    if(it){ fromArchive(it); if(art === "eintrag"){ it.erledigt = false; it.erledigtAm = null; } }
     persistState(); render(); return;
   }
   const weg = e.target.closest("[data-endgueltig]");
@@ -1561,7 +1561,7 @@ $("#einMenu").onclick = e => {
 };
 $("#zeuListe").onclick = e => {
   const b = e.target.closest("[data-zeufach]"); if(!b) return;
-  anteilOeffnen(b.dataset.zeufach);
+  openShareDialog(b.dataset.zeufach);
 };
 
 /* --- Suche --- */
@@ -1594,20 +1594,20 @@ function search(){
 
 /* --- Verhältnis und Zielnote --- */
 let anteilFach = null;
-function anteilOeffnen(fach){
+function openShareDialog(fach){
   anteilFach = fach;
   $("#anTitel").textContent = fachName(fach);
   anWert.value = anteilFuer(fach);
   anZiel.value = ""; $("#anZielErgebnis").textContent = "";
-  anteilVorschau();
+  sharePreview();
   dlgAnteil.showModal();
 }
-function anteilVorschau(){
+function sharePreview(){
   const m = Math.max(0, Math.min(100, Number(anWert.value) || 0));
   $("#anHinweis").textContent = `${m} % mündlich, ${100-m} % schriftlich.`
     + (hatEigenenAnteil(anteilFach) ? "" : " Zurzeit gilt der Standard.");
 }
-anWert.oninput = anteilVorschau;
+anWert.oninput = sharePreview;
 function zielRechnen(){
   const ziel = parseFloat(String(anZiel.value).replace(",", "."));
   const feld = $("#anZielErgebnis");
@@ -2221,7 +2221,7 @@ async function jetztSichern(fragen){
 }
 /* Beim Öffnen von selbst sichern. Ohne erteilte Berechtigung wird nicht
    gefragt — dann übernimmt das Banner, wo ein Antippen die Frage erlaubt. */
-async function autoSicherung(){
+async function autoBackup(){
   if(!cfg.sicherAuto || !sicherungFaellig()) return;
   await ordnerLaden();
   try{
@@ -2832,7 +2832,7 @@ $("#sReiheFach").onclick = e => {
   reihenZeichnen();
 };
 
-function anteilFaecherZeichnen(){
+function renderSubjectShares(){
   const liste = alleFaecher();
   $("#sAnteilFaecher").innerHTML = liste.length
     ? liste.map(f => `<div class="anteilzeile"><span>${esc(fachName(f))}</span>
@@ -2840,7 +2840,7 @@ function anteilFaecherZeichnen(){
           placeholder="${Number(cfg.anteilM)||0}" value="${hatEigenenAnteil(f) ? cfg.anteile[f] : ""}"></div>`).join("")
     : `<p class="hinweis">Sobald Fächer im Plan stehen, erscheinen sie hier.</p>`;
 }
-function anteilFaecherLesen(){
+function readSubjectShares(){
   const o = {};
   document.querySelectorAll("[data-anteilfach]").forEach(el => {
     const v = el.value.trim();
@@ -2888,7 +2888,7 @@ function sicherungStand(){
     ? `Letzte Sicherung vor ${zahl(alter,"Tag","Tagen")} — Zeit für eine neue.`
     : `Letzte Sicherung: ${zeigDatum(l)}${alter ? ` (vor ${zahl(alter,"Tag","Tagen")})` : " (heute)"}.`;
 }
-function archivHinweisEinstellung(){
+function archiveNoticeSetting(){
   const tage = Math.max(0, Number(sArchivTage.value) || 0);
   const el = $("#sArchivHinweis");
   if(!tage){
@@ -2898,7 +2898,7 @@ function archivHinweisEinstellung(){
     return;
   }
   /* Vor dem Speichern zeigen, was diese Wahl sofort kosten würde. */
-  const jetzt = archivListe();
+  const jetzt = archiveList();
   const weg = jetzt.filter(a => {
     const alter = Math.round((new Date() - new Date(a.seit+"T12:00"))/864e5);
     return alter >= tage;
@@ -2908,7 +2908,7 @@ function archivHinweisEinstellung(){
     + (weg ? ` Beim Speichern verschwinden dadurch sofort ${zahl(weg,"Eintrag","Einträge")}.` : "");
   el.style.color = weg ? "var(--akzent)" : "";
 }
-sArchivTage.onchange = archivHinweisEinstellung;
+sArchivTage.onchange = archiveNoticeSetting;
 
 function rhythmHint(){
   const tage = Math.max(0, Number(sRhythmus.value) || 0);
@@ -2972,11 +2972,11 @@ function einstellungenOeffnen(){
   $("#sFarbVorlagen").innerHTML = FARBEN.map(f =>
     `<button type="button" data-farbe="${f}" style="border-color:${f};color:${f}">${f}</button>`).join("");
   sNotenSystem.value = cfg.notenSystem; sAnteilM.value = Number(cfg.anteilM)||0;
-  anteilHinweis(); anteilFaecherZeichnen();
+  anteilHinweis(); renderSubjectShares();
   sStdProTag.value = Math.max(1, Number(cfg.stdProTag) || 8);
   sArchivTage.value = String(archivFrist());
   if(sArchivTage.selectedIndex < 0) sArchivTage.value = "0";
-  archivHinweisEinstellung();
+  archiveNoticeSetting();
   reiheEinListe = reiheEin().slice();
   reiheFachListe = fachReihenfolge().slice();
   reihenZeichnen();
@@ -3110,7 +3110,7 @@ $("#sTeilen").onclick = async () => {
   }
 };
 /* Ersetzt sämtliche Profile des Geräts durch die aus der Datei. */
-function alleProfileUebernehmen(liste){
+function importAllProfiles(liste){
   if(!confirm("Diese Sicherung enthält alle Profile. Sämtliche Profile auf diesem "
     + "Gerät werden dadurch ersetzt. Fortfahren?")) return;
   const vorher = profile.map(p => p.id), neu = [];
@@ -3138,7 +3138,7 @@ $("#sLaden").onclick = () => {
   let d;
   try{ d = JSON.parse(sDaten.value); }
   catch(e){ return alert("Der Text lässt sich nicht lesen. Ist es wirklich eine Sicherungsdatei?"); }
-  if(d && Array.isArray(d.profile)) return alleProfileUebernehmen(d.profile);
+  if(d && Array.isArray(d.profile)) return importAllProfiles(d.profile);
   const teil = paketSaeubern(d);
   if(!Object.keys(teil).length) return alert("In der Datei steckt kein erkennbarer Stundenplan.");
   /* Einlesen ersetzt, es ergänzt nicht. Wer das übersieht, verliert einen
@@ -3191,7 +3191,7 @@ $("#bEinstSpeichern").onclick = () => {
   cfg.land = sLand.value;
   cfg.notenSystem = sNotenSystem.value;
   cfg.anteilM = Math.max(0, Math.min(100, Number(sAnteilM.value)||0));
-  cfg.anteile = anteilFaecherLesen();
+  cfg.anteile = readSubjectShares();
   cfg.lehrer = textPaare(sLehrer.value);
   cfg.fachnamen = textPaare(sFaecher.value);
   if(/^#[0-9a-fA-F]{6}$/.test(sFarbeHex.value.trim())) cfg.akzent = sFarbeHex.value.trim();
@@ -3312,7 +3312,7 @@ function initApp(){
   checkVersion();
   meldemerkerAufraeumen();
   erinnerungenPruefen().catch(() => {});
-  autoSicherung().catch(() => {});
+  autoBackup().catch(() => {});
   /* Die Profilauswahl steht am Anfang, nicht nur bei mehreren Profilen:
      wer sie sieht, weiß, in welchem Datensatz er gleich schreibt. */
   const wann = cfg.startProfil || "immer";

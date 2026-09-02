@@ -38,12 +38,12 @@ pruef("Stempel überlebt einen Neustart", geschrieben.every(d => d === new Date(
 
 const ohneFrist = await page.evaluate(() => document.getElementById("einSubHinweis").textContent);
 pruef("Hinweis ohne Frist nennt keine Löschung", /bis du es selbst entfernst/.test(ohneFrist), ohneFrist);
-pruef("beide Einträge noch da", (await page.evaluate(() => archivListe().length)) === 2);
+pruef("beide Einträge noch da", (await page.evaluate(() => archiveList().length)) === 2);
 
 /* Frist setzen — die alten Einträge dürfen NICHT sofort verschwinden. */
 await page.evaluate(() => { cfg.archivTage = 30; persistState(); normalize(); render(); });
 pruef("30-Tage-Frist entfernt frisch Archiviertes nicht",
-      (await page.evaluate(() => archivListe().length)) === 2);
+      (await page.evaluate(() => archiveList().length)) === 2);
 const mitFrist = await page.evaluate(() => {
   einSub = "archiv"; render(); return document.getElementById("einSubHinweis").textContent; });
 pruef("Hinweis nennt die Frist", /30 Tage nach dem Löschen endgültig entfernt/.test(mitFrist), mitFrist);
@@ -55,7 +55,7 @@ const nachAblauf = await page.evaluate(() => {
   eintraege.find(e => e.id === "a1").geloeschtAm = iso(plusTage(new Date(), -31));
   eintraege.find(e => e.id === "a2").geloeschtAm = iso(plusTage(new Date(), -3));
   persistState(); normalize(); render();
-  return { übrig: archivListe().map(a => a.id), aktiv: eintraege.some(e => e.id === "a3") };
+  return { übrig: archiveList().map(a => a.id), aktiv: eintraege.some(e => e.id === "a3") };
 });
 pruef("abgelaufener Eintrag ist endgültig weg", !nachAblauf.übrig.includes("a1"), nachAblauf.übrig.join(", "));
 pruef("Eintrag innerhalb der Frist bleibt", nachAblauf.übrig.includes("a2"));
@@ -86,7 +86,7 @@ const warnung = await page.evaluate(() => {
                   geloescht:true, geloeschtAm:iso(plusTage(new Date(), -200))});
   persistState(); einstellungenOeffnen();
   document.getElementById("sArchivTage").value = "90";
-  archivHinweisEinstellung();
+  archiveNoticeSetting();
   return document.getElementById("sArchivHinweis").textContent;
 });
 pruef("Einstellung warnt vor sofortigem Verlust", /verschwinden dadurch sofort 1 Eintrag/.test(warnung), warnung);
