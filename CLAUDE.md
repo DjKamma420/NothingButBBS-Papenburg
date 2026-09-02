@@ -1,9 +1,9 @@
 # Stundenplan BBS Papenburg — Kontext für Claude
 
 Abgeleitet von [StundenplanNothing](https://github.com/DjKamma420/StundenplanNothing).
-Gleiche Architektur, gleiche Regeln — siehe dort für Details zu Aufbau,
-Abschnitten in `app.js` und Begriffen im Code. Diese Datei hält nur fest,
-was hier anders ist.
+Gleiche Architektur, bis auf die unten gelisteten Unterschiede gleiche
+Regeln — siehe dort für Details zu Aufbau und Abschnitten in `app.js`.
+Diese Datei hält nur fest, was hier anders ist.
 
 ## Unterschiede zum Ursprungsprojekt
 
@@ -18,6 +18,21 @@ was hier anders ist.
    ausschließlich in CI. `android/`, `www/`, `node_modules/` werden nie
    committet — sie entstehen bei jedem Lauf neu aus derselben Dateiliste,
    die auch `sw.js` kennt (`werkzeug/seite-bauen.mjs`).
+3. **Bezeichner in `app.js`/`index.html` sind hier Englisch, nicht Deutsch**
+   — abweichend von Regel 5 des Ursprungsprojekts, ausdrücklich vom Nutzer
+   so gewollt (2026-09-02). Neuer Code in diesem Fork: englische Namen,
+   englische Kommentare (Warum, nicht Was — die Regel selbst bleibt). Beim
+   Übertragen von Fixes aus StundenplanNothing entsprechend übersetzen,
+   nicht wörtlich kopieren. `CLAUDE.md`, `CHANGELOG.md` und
+   `KOMMUNIKATION.md` bleiben Deutsch (Doku für den Nutzer).
+4. **Sprachumschalter in der App** (⚙ → Sprache oder vergleichbar):
+   Oberflächentext liegt als Übersetzungstabelle vor, Standard Deutsch
+   (bestehende Nutzererwartung), zuschaltbar Englisch. Layout/Design bleiben
+   wie im Ursprungsprojekt — nur die Textquelle wird sprachabhängig, keine
+   neuen Klassen/Strukturen nur für die Übersetzung. Texte in Dialogen/HTML
+   dafür nicht mehr hart im Markup, sondern über die Übersetzungstabelle;
+   `esc()` gilt für sprachabhängigen wie für jeden anderen eingesetzten
+   Text weiter.
 
 ## Harte Regel — nicht stillschweigend neu verhandeln
 
