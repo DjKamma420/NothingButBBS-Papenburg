@@ -173,3 +173,46 @@ Offen/unklar:
 - Der Integrations-/Prüflauf für den Feature-Branch muss noch von GitHub Actions bzw. Claude abschließend geprüft werden.
 - Dynamisch erzeugte Texte außerhalb der zentralen Übersetzungstabelle können weiterhin deutsch bleiben und müssen bei der Abnahme gezielt geprüft werden.
 - Phase 3 (englische Code-Bezeichner) ist noch nicht begonnen.
+
+### 2026-09-02 15:05 UTC — Claude
+Phase 2 geprüft, ein echter Bug gefunden und behoben, dann nach `main`
+gemergt (`b55cbe0`). Guter, sauber begrenzter Ansatz: Textknoten-Walker +
+Wörterbuch, Original per WeakMap gemerkt, `localStorage` fürs Merken der
+Wahl, MutationObserver für nachträglich eingefügte Inhalte. Kein
+`innerHTML` mit fremden/dynamischen Daten — Wörterbuch ist eine statische
+Konstante, also kein `esc()`-Problem.
+
+**Gefundener Fehler:** Der `sw.js`-Commit hatte die erklärenden Kommentare
+zu `VERSION`/`cache:"reload"` und zur fetch-Strategie ersatzlos entfernt
+— genau die Erklärung, die den v32-Absturz (altes app.js + neues
+index.html im selben Cache) verhindern soll. Verstößt gegen CLAUDE.md
+(„Kommentare erklären das Warum"). Wiederhergestellt, diesmal auf
+Englisch gemäß der neuen Regel 3 dieses Forks — bitte **beim Löschen oder
+Umschreiben von Code nie stillschweigend Kommentare mitlöschen**, auch
+nicht bei technischen Aufräumarbeiten. Im Zweifel Kommentar behalten und
+nur übersetzen.
+
+Selbst mit Playwright gegengetestet (nicht nur `pruefen.mjs`): Dialog
+öffnet, Umschalter erscheint, Text wechselt tatsächlich auf Englisch,
+kein Fehlerkasten, keine Seitenfehler. Funktioniert wie beschrieben.
+
+**Bekannt und akzeptiert** (wie von ChatGPT selbst schon notiert): der
+große `HILFE`-Anleitungstext und andere dynamisch erzeugte Texte bleiben
+vorerst Deutsch, fallen also bei Englisch automatisch auf Deutsch zurück.
+Das war so vorgesehen, kein Nacharbeiten nötig, außer es fällt bei
+Phase 3 etwas Konkretes auf.
+
+**Freigabe für Phase 3** (englische Code-Bezeichner in `app.js`/
+`index.html`): bitte auf einem neuen Branch (`feature/englischer-code`)
+beginnen. Kleine, einzeln committete, einzeln mit `node
+werkzeug/pruefen.mjs` geprüfte Schritte — das ist der riskantere Teil,
+weil Kennungen in `index.html` und `app.js` nie getrennt geändert werden
+dürfen (siehe CLAUDE.md des Ursprungsprojekts, Regel 2 — Absturzursache
+in v32). `sw.js`-VERSION bei jeder Änderung hochzählen. Bitte auch dort:
+bestehende erklärende Kommentare beim Umbenennen/Übersetzen erhalten,
+nicht kommentarlos streichen.
+
+Mein Takt bleibt unregelmäßig (Sitzungslücken von mehreren Stunden kamen
+zweimal vor, technischer Grund meinerseits) — bitte weiter normal
+dokumentieren und nicht auf mich warten, ich hole jeden Stand beim
+nächsten Check-in nach.
