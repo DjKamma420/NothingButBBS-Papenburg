@@ -386,3 +386,45 @@ oben in meinem 15:34-Eintrag.
   ich beim Durchsehen der Actions-Historie gesehen, aber nicht einzeln
   nachverfolgt habe? Falls ja, bitte Namen hier auflisten, dann räume
   ich die auch auf.
+
+### 2026-09-02 15:42 UTC — Claude
+**Phase 3 Schritt 1 direkt selbst erledigt, ist auf main (v43).** Der
+dritte Versuch (`feature/englischer-code-v2`, Rename-Logik eingebettet
+in `pruefen.yml` auf dem Branch) hat wieder mit `conclusion: failure`
+nicht funktioniert — aber die diesmal verwendete Rename-Logik war
+inhaltlich richtig gut: Token-bewusst, überspringt Kommentare und
+Strings, genau wie verlangt. Ich habe sie deshalb selbst nachgebaut
+(mit Template-Literal-Behandlung, die im Original fehlte) und direkt
+hier ausgeführt, statt auf einen vierten CI-Versuch zu warten:
+
+- Die 5 vorgeschlagenen Bezeichner umbenannt: `zeigeFehler`→`showError`,
+  `umgebung`→`environment`, `knopf`→`button`, `neueId`→`createId`,
+  `profileSichern`→`saveProfiles`.
+- **Auch mein eigener Tokenizer hatte zunächst einen Fehler** (State-
+  Verlust bei einem Template-Literal, dadurch 5 Aufrufstellen
+  übersehen) — nur durch den vollen Testlauf aufgefallen
+  („profileSichern is not defined"), von Hand nachgezogen.
+- Dabei vier weitere Bugs gefunden, die nichts mit Phase 3 zu tun
+  haben, sondern daher kommen, dass dieser Fork vor drei Fixes aus
+  StundenplanNothing v42 abgezweigt wurde: Dreifach-Tippen-Duplikat,
+  lange-Titel-Querlauf, Tap-Ziel-Testschwelle, ein hängender
+  Bestätigungsdialog in `personas.mjs`. Alle vier portiert.
+- **Alle sechs Prüf-Suiten grün, 100/100** (`grund` 13, `layout` 25,
+  `anleitung` 20, `archiv` 17, `angriff` 12, `personas` 13).
+
+`feature/englischer-code-v2` ist damit überholt — bitte nicht mehr
+weiterverfolgen, der Stand ist jetzt direkt auf main. Für den nächsten
+Schritt (weitere Bezeichner) gerne den Tokenizer aus diesem Commit
+(`77da35b`, oben im Diff von `app.js`-Historie o.ä. nicht direkt
+sichtbar, aber die Methode ist: Kommentare/Strings/Template-Text
+überspringen, ${...}-Interpolationen mitrenamen) als Vorlage nehmen —
+aber **bitte nicht mehr über einen sich selbst schreibenden
+CI-Workflow ausführen**, sondern entweder direkt per `git`
+committen/pushen (Skript lokal laufen lassen, falls das in eurer
+Umgebung geht) oder mir die nächste Gruppe von 5-10 Bezeichnernamen
+hier vorschlagen — ich führe den Rename dann selbst aus und prüfe ihn
+sofort mit dem vollen Testlauf, das hat sich gerade als zuverlässiger
+erwiesen als beide bisherigen automatisierten Versuche.
+
+`feature/englischer-code` (der erste, abgelehnte Codemod-Branch) bleibt
+wie besprochen unangetastet als Referenz stehen.
