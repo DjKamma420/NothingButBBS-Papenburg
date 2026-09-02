@@ -40,7 +40,7 @@ await page.waitForTimeout(120);
 /* Dialoge, die den Payload anzeigen */
 await page.evaluate(() => { try{ subjectInfo(0); }catch(e){} });
 await page.waitForTimeout(80);
-await page.evaluate(() => { document.querySelectorAll("dialog").forEach(d=>d.close()); try{ einstellungenOeffnen(); }catch(e){} });
+await page.evaluate(() => { document.querySelectorAll("dialog").forEach(d=>d.close()); try{ openSettings(); }catch(e){} });
 await page.waitForTimeout(150);
 await page.evaluate(() => { document.querySelectorAll("dialog").forEach(d=>d.close()); try{ hilfeOeffnen(); const s=document.getElementById("hilfeSuche"); s.value="Chemie"; s.dispatchEvent(new Event("input")); }catch(e){} });
 await page.waitForTimeout(150);
@@ -58,7 +58,7 @@ const boese = JSON.stringify({
   eintraege:[{id:"z",typ:"M",fach:"CH",datum:"2026-01-01",titel:"<img src=x onerror=window.__x=1>",bilder:['" onerror=window.__x=1 x="', "javascript:alert(1)"]}],
   noten:[], sonder:[], ferien:[{von:"2026-01-01",bis:"x",name:"<img src=x onerror=window.__x=1>",typ:"eigen"}]
 });
-await page.evaluate(() => einstellungenOeffnen()); await page.waitForTimeout(200);
+await page.evaluate(() => openSettings()); await page.waitForTimeout(200);
 await page.fill("#sDaten", boese);
 await page.click("#sLaden"); await page.waitForTimeout(400);
 await page.evaluate(() => { ["tag","kalender","zeugnis","eintraege"].forEach(v=>{ansicht=v;try{render()}catch(e){}}); });

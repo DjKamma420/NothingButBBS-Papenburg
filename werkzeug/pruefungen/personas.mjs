@@ -110,7 +110,7 @@ pruef("kein Fehler bei 500 Einträgen", (await fehlerkasten(page)) === null);
 
 let gefragt = [];
 page.on("dialog", async d => { gefragt.push(d.message()); await d.dismiss(); });   // ausdrücklich ablehnen
-await page.evaluate(() => { window.__vorReset = eintraege.length; einstellungenOeffnen(); });
+await page.evaluate(() => { window.__vorReset = eintraege.length; openSettings(); });
 await page.waitForTimeout(200);
 await page.click("#sReset"); await page.waitForTimeout(200);
 const nachAbbruch = await page.evaluate(() => eintraege.length);

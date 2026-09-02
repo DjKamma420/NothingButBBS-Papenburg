@@ -196,13 +196,13 @@ function loadState(){
   sonder    = Speicher.lies("sonder", []);
   noten     = Speicher.lies("noten", []);
   merkblattUmziehen();
-  datenMigrieren();
+  migrateData();
 }
 /* Bis Fassung 3 erledigen normalize() und merkblattUmziehen() die
    Umstellung alter Formen von selbst; hier wird nur festgehalten, worauf
    spätere Schritte aufsetzen. Wichtig ist der umgekehrte Fall: Daten aus
    einer neueren App-Fassung dürfen nicht stillschweigend beschnitten werden. */
-function datenMigrieren(){
+function migrateData(){
   const war = Number(cfg.fassung) || 0;
   if(war === SCHEMA) return;
   if(war > SCHEMA){
@@ -1298,7 +1298,7 @@ function toggleType(){
   eNotiz.style.minHeight = merk ? "220px" : "";
   $("#eWertLabel").textContent = cfg.notenSystem === "punkte15" ? "Punkte 0–15" : "Note 1–6";
   if(ev) $("#eFachFreiWrap").classList.add("hidden"); else freiUmschalten();
-  bilderZeichnen();
+  renderImages();
 }
 
 /* --- Datumsauswahl mit Punkten an den Tagen des gewählten Fachs --- */
@@ -1340,7 +1340,7 @@ $("#eGitter").onclick = e => {
 };
 
 /* --- Bilder: verkleinern, sonst platzt der Browserspeicher --- */
-function bilderZeichnen(){
+function renderImages(){
   $("#eBilder").innerHTML = bilder.map((b,i) =>
     `<div class="bildweg"><img src="${esc(b)}" alt=""><button type="button" data-bildweg="${i}">×</button></div>`).join("");
   const kb = Math.round(bilder.reduce((s,b) => s + b.length, 0) / 1024 * 0.75);
@@ -1351,15 +1351,15 @@ function bilderZeichnen(){
 }
 $("#eBilder").onclick = e => {
   const b = e.target.closest("[data-bildweg]"); if(!b) return;
-  bilder.splice(+b.dataset.bildweg, 1); bilderZeichnen();
+  bilder.splice(+b.dataset.bildweg, 1); renderImages();
 };
 $("#bBildWahl").onclick = () => bildDatei.click();
 bildDatei.onchange = () => {
   const dateien = [...(bildDatei.files || [])];
-  dateien.forEach(datei => bildVerkleinern(datei, d => { bilder.push(d); bilderZeichnen(); }));
+  dateien.forEach(datei => shrinkImage(datei, d => { bilder.push(d); renderImages(); }));
   bildDatei.value = "";
 };
-function bildVerkleinern(datei, fertig){
+function shrinkImage(datei, fertig){
   const leser = new FileReader();
   leser.onload = () => {
     const bild = new Image();
@@ -1706,13 +1706,13 @@ $("#bImportText").onclick = () => {
   if(treffer){ importTabelle(werte); $("#iErgebnis").textContent = `${treffer} Zeilen übernommen. Prüfen und speichern.`; }
   else $("#iErgebnis").textContent = "Nichts erkannt. Die Stundennummern müssen mitkopiert sein.";
 };
-$("#bImportAb").onclick = () => { dlgImport.close(); if(zurueckZuEinst){ zurueckZuEinst = false; einstellungenOeffnen(); } };
+$("#bImportAb").onclick = () => { dlgImport.close(); if(zurueckZuEinst){ zurueckZuEinst = false; openSettings(); } };
 $("#bImportSpeichern").onclick = () => {
   const woche = cfg.zweiWochen ? iWoche.value : "A", tag = TAGE[+iTag.value];
   importAuslesen().forEach((w,i) => {
     plan[woche][tag][i] = w.fach ? {fach:w.fach.toUpperCase(), raum:w.raum, lk:w.lk} : null; });
   persistState(); dlgImport.close();
-  if(zurueckZuEinst){ zurueckZuEinst = false; render(); einstellungenOeffnen(); return; }
+  if(zurueckZuEinst){ zurueckZuEinst = false; render(); openSettings(); return; }
   ansicht = "tag"; gewaehlt = plusTage(mondayOf(gewaehlt), +iTag.value); render();
 };
 
@@ -1879,7 +1879,7 @@ function meldemerkerAufraeumen(){
     .filter(k => k.includes("_gemeldet_") && !k.endsWith(heute))
     .forEach(k => { try{ localStorage.removeItem(k); }catch(e){} });
 }
-async function erinnerungenPruefen(){
+async function checkReminders(){
   if(!cfg.melden) return;
   const heute = new Date(), key = "gemeldet_" + iso(heute);
   if(Speicher.lies(key, false)) return;
@@ -1994,7 +1994,7 @@ function slotsSaeubern(l){
   })).filter(s => s.std && s.von && s.bis);
   return raus.length ? raus : STANDARD.slots.slice();
 }
-function cfgSaeubern(roh){
+function sanitizeConfig(roh){
   const c = Object.assign({}, STANDARD, (roh && typeof roh === "object") ? roh : {});
   c.klasse      = alsText(c.klasse, 40);
   c.slots       = slotsSaeubern(c.slots);
@@ -2040,7 +2040,7 @@ function planSaeubern(roh){
   });
   return raus;
 }
-function eintragSaeubern(e){
+function sanitizeEntry(e){
   if(!e || typeof e !== "object" || !ART[e.typ]) return null;
   const raus = {
     id:     alsId(e.id),
@@ -2095,9 +2095,9 @@ function noteSaeubern(g){
 function paketSaeubern(d){
   const p = {};
   if(!d || typeof d !== "object") return p;
-  if(d.cfg  && typeof d.cfg  === "object") p.cfg  = cfgSaeubern(d.cfg);
+  if(d.cfg  && typeof d.cfg  === "object") p.cfg  = sanitizeConfig(d.cfg);
   if(d.plan && typeof d.plan === "object") p.plan = planSaeubern(d.plan);
-  if(Array.isArray(d.eintraege)) p.eintraege = d.eintraege.slice(0,5000).map(eintragSaeubern).filter(Boolean);
+  if(Array.isArray(d.eintraege)) p.eintraege = d.eintraege.slice(0,5000).map(sanitizeEntry).filter(Boolean);
   if(Array.isArray(d.ferien))    p.ferien    = d.ferien.slice(0,2000).map(freiSaeubern).filter(Boolean);
   if(Array.isArray(d.sonder))    p.sonder    = d.sonder.slice(0,5000).map(sonderSaeubern).filter(Boolean);
   if(Array.isArray(d.noten))     p.noten     = d.noten.slice(0,5000).map(noteSaeubern).filter(Boolean);
@@ -2860,20 +2860,20 @@ sNotenSystem.onchange = () => {
    Wer nur Zeichen zählt, meldet die Hälfte und wundert sich, warum bei
    „2500 kB" nichts mehr hineinpasst. Schlüsselnamen zählen mit. */
 const GRENZE_KB = 5120;
-function belegteKb(){
+function usedKb(){
   let zeichen = 0;
   try{ for(const k in localStorage) if(Object.prototype.hasOwnProperty.call(localStorage,k))
     zeichen += k.length + (localStorage[k] || "").length; }catch(e){}
   return Math.round(zeichen * 2 / 1024);
 }
-const speicherAnteil = () => Math.min(100, Math.round(belegteKb() / GRENZE_KB * 100));
+const speicherAnteil = () => Math.min(100, Math.round(usedKb() / GRENZE_KB * 100));
 const speicherWarnung = () => {
   const a = speicherAnteil();
   return a >= 80 ? `Der Speicher ist zu ${a} % voll. Lege eine Sicherung an und `
     + `entferne alte Bilder aus Merkblättern, sonst gehen neue Einträge verloren.` : "";
 };
 function speicherStand(){
-  const kb = belegteKb(), warn = speicherWarnung();
+  const kb = usedKb(), warn = speicherWarnung();
   const bilderZahl = eintraege.reduce((s,e) => s + ((e.bilder||[]).length), 0);
   const el = $("#sSpeicher");
   el.textContent = `${kb} kB von rund ${GRENZE_KB} kB belegt (${speicherAnteil()} %) · `
@@ -2961,7 +2961,7 @@ $("#sOrdnerJetzt").onclick = async () => {
   await jetztSichern(true);
   ordnerStand();
 };
-function einstellungenOeffnen(){
+function openSettings(){
   sKlasse.value = cfg.klasse;
   sZweiWochen.checked = cfg.zweiWochen;
   slotEditorZeichnen(cfg.slots);
@@ -3004,7 +3004,7 @@ function einstellungenOeffnen(){
   sicherungStand(); speicherStand(); checkVersion();
   dlgEinst.showModal();
 }
-$("#btnEinst").onclick = einstellungenOeffnen;
+$("#btnEinst").onclick = openSettings;
 sZweiWochen.onchange = () => {
   $("#ankerWrap").classList.toggle("hidden", !sZweiWochen.checked);
   $("#sWocheKopieren").classList.toggle("hidden", !sZweiWochen.checked);
@@ -3287,7 +3287,7 @@ window.addEventListener("storage", e => {
 /* Ohne <dialog> läuft hier fast nichts: jeder Eintrag, jede Einstellung
    steckt darin. Safari kennt es erst ab iOS 15.4. Ein klarer Satz ist besser
    als Knöpfe, die stumm bleiben. */
-function browserPruefen(){
+function checkBrowser(){
   const fehlt = [];
   if(!window.HTMLDialogElement || !HTMLDialogElement.prototype.showModal) fehlt.push("Dialogfenster");
   try{ if(!window.localStorage) fehlt.push("Speicher"); }catch(e){ fehlt.push("Speicher"); }
@@ -3303,7 +3303,7 @@ function initApp(){
     cfg = Object.assign({}, STANDARD, cfg || {});
     cfg.slots = STANDARD.slots.slice();
   }
-  browserPruefen();
+  checkBrowser();
   themaAnwenden();
   startAnsicht();
   normalize();
@@ -3311,7 +3311,7 @@ function initApp(){
   render();
   checkVersion();
   meldemerkerAufraeumen();
-  erinnerungenPruefen().catch(() => {});
+  checkReminders().catch(() => {});
   autoBackup().catch(() => {});
   /* Die Profilauswahl steht am Anfang, nicht nur bei mehreren Profilen:
      wer sie sieht, weiß, in welchem Datensatz er gleich schreibt. */

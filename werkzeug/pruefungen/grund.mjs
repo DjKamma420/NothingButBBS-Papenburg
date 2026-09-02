@@ -33,7 +33,7 @@ const boese = JSON.stringify({
                 bilder: ['" onerror=window.__BOESE=3 x="'] }],
   noten: [], sonder: [], ferien: [],
 });
-await page.evaluate(() => einstellungenOeffnen());
+await page.evaluate(() => openSettings());
 await page.waitForTimeout(300);
 await page.fill("#sDaten", boese);
 await page.click("#sLaden");

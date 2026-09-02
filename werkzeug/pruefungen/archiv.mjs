@@ -84,7 +84,7 @@ pruef("Zurückholen löscht den Zeitpunkt", zurueck.geloescht === false && zurue
 const warnung = await page.evaluate(() => {
   eintraege.push({id:"a4", typ:"N", fach:"", datum:"2026-01-01", titel:"Uralt",
                   geloescht:true, geloeschtAm:iso(plusTage(new Date(), -200))});
-  persistState(); einstellungenOeffnen();
+  persistState(); openSettings();
   document.getElementById("sArchivTage").value = "90";
   archiveNoticeSetting();
   return document.getElementById("sArchivHinweis").textContent;

@@ -3,7 +3,7 @@ import { starte, ende, pruef, fehlerkasten } from "../browser.mjs";
 
 const { page } = await starte();
 
-await page.evaluate(() => einstellungenOeffnen());
+await page.evaluate(() => openSettings());
 await page.waitForTimeout(300);
 pruef("Knopf in den Einstellungen sichtbar", await page.isVisible("#btnHilfe"));
 await page.click("#btnHilfe");

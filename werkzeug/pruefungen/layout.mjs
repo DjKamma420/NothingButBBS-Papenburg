@@ -34,7 +34,7 @@ for (const breite of [1440, 1280, 390]) {
     document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1));
 
   /* Unter 16 px zoomt Safari auf dem iPhone beim Antippen hinein. */
-  await page.evaluate(() => einstellungenOeffnen());
+  await page.evaluate(() => openSettings());
   await page.waitForTimeout(300);
   const klein = await page.evaluate(() => {
     const zu = [];
