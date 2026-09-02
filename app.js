@@ -153,7 +153,7 @@ const Speicher = {
 };
 /* Alle Schlüssel eines Profils — auch die, die nicht in DATEN stehen
    (etwa die Tagesmerker der Erinnerung). */
-function profilSchluessel(id){
+function profileKey(id){
   try{ return Object.keys(localStorage).filter(k => k.startsWith("p" + id + "_")); }
   catch(e){ return DATEN.map(k => "p" + id + "_" + k); }
 }
@@ -1743,13 +1743,13 @@ function renderProfileSelect(){
       <div class="knum">Anlegen</div></button></div>` : "";
   $("#pGitter").innerHTML = kacheln + neu;
 }
-function profilAuswahlZeigen(manuell){
+function showProfileSelect(manuell){
   profilManuell = !!manuell; profilVerwalten = false;
   renderProfileSelect();
   $("#profilStart").classList.remove("hidden");
 }
 const profilAuswahlSchliessen = () => { $("#profilStart").classList.add("hidden"); profilVerwalten = false; };
-$("#btnProfil").onclick = () => profilAuswahlZeigen(true);
+$("#btnProfil").onclick = () => showProfileSelect(true);
 $("#pZurueck").onclick = profilAuswahlSchliessen;
 $("#pVerwalten").onclick = () => { profilVerwalten = !profilVerwalten; renderProfileSelect(); };
 $("#pGitter").onclick = e => {
@@ -1773,7 +1773,7 @@ $("#pGitter").onclick = e => {
   if(d){
     const x = profile.find(y => y.id === d.dataset.profilweg);
     if(!confirm(`Profil \u201e${x.name}\u201c mit allen Daten löschen? Das lässt sich nicht rückgängig machen.`)) return;
-    profilSchluessel(x.id).forEach(k => { try{ localStorage.removeItem(k); }catch(e){} });
+    profileKey(x.id).forEach(k => { try{ localStorage.removeItem(k); }catch(e){} });
     profile = profile.filter(y => y.id !== x.id);
     if(profilId === x.id){ profilId = profile[0].id; loadState(); normalize(); }
     saveProfiles(); profileButton(); renderProfileSelect(); render(); return;
@@ -1875,7 +1875,7 @@ async function melden(titel, text){
    Speicherstand mit. Nur der von heute wird gebraucht. */
 function cleanupReminderFlags(){
   const heute = "_gemeldet_" + iso(new Date());
-  profilSchluessel(profilId)
+  profileKey(profilId)
     .filter(k => k.includes("_gemeldet_") && !k.endsWith(heute))
     .forEach(k => { try{ localStorage.removeItem(k); }catch(e){} });
 }
@@ -1977,7 +1977,7 @@ const alsId      = v => /^[A-Za-z0-9_-]{1,40}$/.test(String(v)) ? String(v) : cr
 const alsBild = v => (typeof v === "string" && v.length < 4e6
   && /^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(v)) ? v : null;
 
-function paareSaeubern(o){
+function sanitizePairs(o){
   const raus = {};
   if(o && typeof o === "object" && !Array.isArray(o))
     Object.entries(o).slice(0, 400).forEach(([k,v]) => {
@@ -2007,8 +2007,8 @@ function sanitizeConfig(roh){
     Object.entries(roh.anteile).slice(0, 400).forEach(([k,v]) => {
       const f = alsKuerzel(k); if(f) c.anteile[f] = alsZahl(v, 0, 100, 50);
     });
-  c.lehrer     = paareSaeubern(c.lehrer);
-  c.fachnamen  = paareSaeubern(c.fachnamen);
+  c.lehrer     = sanitizePairs(c.lehrer);
+  c.fachnamen  = sanitizePairs(c.fachnamen);
   c.akzent     = /^#[0-9a-fA-F]{6}$/.test(String(c.akzent)) ? String(c.akzent) : STANDARD.akzent;
   c.modus      = c.modus === "hell" ? "hell" : "dunkel";
   c.schrift    = ["mono","serif"].includes(c.schrift) ? c.schrift : "system";
@@ -2029,7 +2029,7 @@ function sanitizeConfig(roh){
 }
 const zelleSaeubern = z => (z && typeof z === "object" && alsKuerzel(z.fach))
   ? {fach:alsKuerzel(z.fach), raum:alsText(z.raum, 20), lk:alsText(z.lk, 20)} : null;
-function planSaeubern(roh){
+function sanitizePlan(roh){
   const raus = {};
   ["A","B"].forEach(w => {
     raus[w] = {};
@@ -2092,11 +2092,11 @@ function sanitizeGrade(g){
           geloescht: !!g.geloescht, geloeschtAm: alsDatum(g.geloeschtAm) || null};
 }
 /* Aus beliebigem JSON wird ein Datensatz — oder ein leeres Ergebnis. */
-function paketSaeubern(d){
+function sanitizePackage(d){
   const p = {};
   if(!d || typeof d !== "object") return p;
   if(d.cfg  && typeof d.cfg  === "object") p.cfg  = sanitizeConfig(d.cfg);
-  if(d.plan && typeof d.plan === "object") p.plan = planSaeubern(d.plan);
+  if(d.plan && typeof d.plan === "object") p.plan = sanitizePlan(d.plan);
   if(Array.isArray(d.eintraege)) p.eintraege = d.eintraege.slice(0,5000).map(sanitizeEntry).filter(Boolean);
   if(Array.isArray(d.ferien))    p.ferien    = d.ferien.slice(0,2000).map(sanitizeFree).filter(Boolean);
   if(Array.isArray(d.sonder))    p.sonder    = d.sonder.slice(0,5000).map(sonderSaeubern).filter(Boolean);
@@ -2136,7 +2136,7 @@ async function storeFolderHandle(wert){
     a.onerror   = () => weg(a.error);
   });
 }
-async function ordnerLaden(){
+async function loadFolder(){
   if(!ordnerMoeglich()) return null;
   try{
     const db = await openIdb();
@@ -2150,7 +2150,7 @@ async function ordnerLaden(){
 }
 /* fragen=true nur aus einem Antippen heraus: ohne Geste lehnt der Browser
    die Nachfrage ab, und ein stiller Versuch beim Start soll nicht stören. */
-async function ordnerBereit(fragen){
+async function folderReady(fragen){
   if(!ordner) return false;
   try{
     const art = {mode:"readwrite"};
@@ -2174,7 +2174,7 @@ function stopLimit(){
   return iso(d);
 }
 /** Namen der eigenen Sicherungen im Ordner, älteste zuerst. */
-async function ordnerSicherungen(){
+async function folderBackups(){
   const liste = [];
   if(!ordner) return liste;
   for await (const [name, griff] of ordner.entries()){
@@ -2185,23 +2185,23 @@ async function ordnerSicherungen(){
   return liste.sort((a,b) => a.datum.localeCompare(b.datum));
 }
 /** Löscht die eigenen Sicherungen, die älter sind als die Haltefrist. */
-async function ordnerAufraeumen(){
+async function cleanupFolder(){
   const grenze = stopLimit();
   if(!grenze) return 0;
   let weg = 0;
-  for(const s of await ordnerSicherungen())
+  for(const s of await folderBackups())
     if(s.datum < grenze){ try{ await ordner.removeEntry(s.name); weg++; }catch(e){} }
   return weg;
 }
 /** Schreibt die Sicherung in den Ordner. null heißt: kein Ordner verfügbar. */
 async function saveToFolder(fragen){
-  if(!await ordnerBereit(fragen)) return null;
+  if(!await folderReady(fragen)) return null;
   const name = sicherungDateiname();
   const datei = await ordner.getFileHandle(name, {create:true});
   const strom = await datei.createWritable();
   await strom.write(sicherungInhalt());
   await strom.close();
-  const weg = await ordnerAufraeumen();
+  const weg = await cleanupFolder();
   sicherungNotiert();
   return {name, weg};
 }
@@ -2223,7 +2223,7 @@ async function saveNow(fragen){
    gefragt — dann übernimmt das Banner, wo ein Antippen die Frage erlaubt. */
 async function autoBackup(){
   if(!cfg.sicherAuto || !sicherungFaellig()) return;
-  await ordnerLaden();
+  await loadFolder();
   try{
     const fertig = await saveToFolder(false);
     if(fertig) shortHint(`Sicherung angelegt: ${fertig.name}`
@@ -2924,15 +2924,15 @@ sRhythmus.onchange = rhythmHint;
 sHalten.onchange = rhythmHint;
 
 /* --- Ordner: Anzeige und Knöpfe --- */
-async function ordnerStand(){
+async function folderStatus(){
   const el = $("#sOrdnerStand");
   if(!el) return;
   if(!ordner){ el.textContent = "Noch kein Ordner gewählt. Sicherungen gehen in die Downloads."; return; }
-  const frei = await ordnerBereit(false);
+  const frei = await folderReady(false);
   let zusatz = "";
   if(frei){
     try{
-      const liste = await ordnerSicherungen();
+      const liste = await folderBackups();
       const grenze = stopLimit();
       const alt = grenze ? liste.filter(x => x.datum < grenze).length : 0;
       zusatz = ` · ${zahl(liste.length,"Sicherung","Sicherungen")} darin`
@@ -2948,18 +2948,18 @@ $("#sOrdnerWahl").onclick = async () => {
     const gewaehlterOrdner = await window.showDirectoryPicker({mode:"readwrite", id:"stundenplan"});
     ordner = gewaehlterOrdner;
     await storeFolderHandle(ordner);
-    ordnerStand();
+    folderStatus();
   }catch(e){ if(e && e.name !== "AbortError") showError("Ordner: " + ((e && e.message) || e)); }
 };
 $("#sOrdnerWeg").onclick = async () => {
   ordner = null;
   try{ await storeFolderHandle(null); }catch(e){}
-  ordnerStand();
+  folderStatus();
 };
 $("#sOrdnerJetzt").onclick = async () => {
   if(!ordner) return alert("Wähle zuerst einen Ordner.");
   await saveNow(true);
-  ordnerStand();
+  folderStatus();
 };
 function openSettings(){
   sKlasse.value = cfg.klasse;
@@ -2994,7 +2994,7 @@ function openSettings(){
   rhythmHint();
   $("#sOrdnerGeht").classList.toggle("hidden", !ordnerMoeglich());
   $("#sOrdnerGehtNicht").classList.toggle("hidden", ordnerMoeglich());
-  if(ordnerMoeglich()) ordnerLaden().then(ordnerStand);
+  if(ordnerMoeglich()) loadFolder().then(folderStatus);
   sDaten.value = sicherungsText();
   $("#ankerJetzt").textContent = `Diese Woche ist KW ${calendarWeek(new Date())}, also ${calendarWeek(new Date())%2===1?"A":"B"}.`;
   $("#ankerWrap").classList.toggle("hidden", !cfg.zweiWochen);
@@ -3117,7 +3117,7 @@ function importAllProfiles(liste){
   liste.slice(0, 20).forEach((p, i) => {
     const id = alsId(p && p.id);
     if(neu.some(x => x.id === id)) return;
-    const rein = paketSaeubern(p);
+    const rein = sanitizePackage(p);
     DATEN.filter(k => k !== "merkblatt").forEach(k => {
       const wert = rein[k] !== undefined ? rein[k]
                  : (k === "cfg" || k === "plan") ? {} : [];
@@ -3129,7 +3129,7 @@ function importAllProfiles(liste){
   /* Was vorher da war und in der Sicherung nicht vorkommt, wäre sonst
      unerreichbarer Ballast im Speicher. */
   vorher.filter(id => !neu.some(x => x.id === id))
-    .forEach(id => profilSchluessel(id).forEach(k => { try{ localStorage.removeItem(k); }catch(e){} }));
+    .forEach(id => profileKey(id).forEach(k => { try{ localStorage.removeItem(k); }catch(e){} }));
   profile = neu; profilId = neu[0].id; saveProfiles();
   loadState(); normalize(); persistState(); profileButton();
   ansicht = "tag"; einSub = null; dlgEinst.close(); render();
@@ -3139,7 +3139,7 @@ $("#sLaden").onclick = () => {
   try{ d = JSON.parse(sDaten.value); }
   catch(e){ return alert("Der Text lässt sich nicht lesen. Ist es wirklich eine Sicherungsdatei?"); }
   if(d && Array.isArray(d.profile)) return importAllProfiles(d.profile);
-  const teil = paketSaeubern(d);
+  const teil = sanitizePackage(d);
   if(!Object.keys(teil).length) return alert("In der Datei steckt kein erkennbarer Stundenplan.");
   /* Einlesen ersetzt, es ergänzt nicht. Wer das übersieht, verliert einen
      Plan, den es nirgends sonst gibt. */
@@ -3163,7 +3163,7 @@ $("#sReset").onclick = () => {
   if(!confirm("Plan, Einträge, Noten, Merkblätter und Archiv dieses Profils löschen?")) return;
   /* Auch die Nebenschlüssel — sonst bleibt etwa der Merker „heute schon
      erinnert" stehen und das frische Profil schweigt. */
-  profilSchluessel(profilId).forEach(k => { try{ localStorage.removeItem(k); }catch(e){} });
+  profileKey(profilId).forEach(k => { try{ localStorage.removeItem(k); }catch(e){} });
   Speicher.puffer = {};
   cfg = Object.assign({}, STANDARD); plan = {}; eintraege = []; ferien = []; sonder = []; noten = [];
   normalize(); persistState(); dlgEinst.close(); render();
@@ -3316,7 +3316,7 @@ function initApp(){
   /* Die Profilauswahl steht am Anfang, nicht nur bei mehreren Profilen:
      wer sie sieht, weiß, in welchem Datensatz er gleich schreibt. */
   const wann = cfg.startProfil || "immer";
-  if(wann === "immer" || (wann === "mehrere" && profile.length > 1)) profilAuswahlZeigen(false);
+  if(wann === "immer" || (wann === "mehrere" && profile.length > 1)) showProfileSelect(false);
 }
 try{ initApp(); }
 catch(e){ showError(e.message, (e.stack||"").split("\n")[1] || ""); }

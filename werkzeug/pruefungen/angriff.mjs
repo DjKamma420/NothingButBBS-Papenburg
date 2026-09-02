@@ -76,7 +76,7 @@ pruef("javascript: als Akzentfarbe verworfen", /^#[0-9a-f]{6}$/i.test(akz), akz)
 const proto = await page.evaluate(() => {
   const vorher = ({}).polluted;
   const d = JSON.parse('{"cfg":{"__proto__":{"polluted":"JA"},"lehrer":{"__proto__":{"polluted2":"JA"}}}}');
-  try { paketSaeubern(d); } catch(e){}
+  try { sanitizePackage(d); } catch(e){}
   return { global: ({}).polluted, global2: ({}).polluted2, vorher };
 });
 pruef("keine Prototype-Pollution über Import", proto.global === undefined && proto.global2 === undefined, JSON.stringify(proto));
