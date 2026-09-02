@@ -72,6 +72,52 @@ pruef("ungültige Bild-URIs beim Import verworfen", bilder.length === 0, JSON.st
 const akz = await page.evaluate(() => cfg.akzent);
 pruef("javascript: als Akzentfarbe verworfen", /^#[0-9a-f]{6}$/i.test(akz), akz);
 
+/* Sicherung/Wiederherstellung: eine echte Rundreise (export → import) darf
+   keinen Wert verlieren. Das sichert insbesondere das JSON-Schema von
+   sicherungsText() ab (Schlüssel cfg/plan/eintraege/ferien/sonder/noten),
+   das später bei einer Umbenennung der gleichnamigen Variablen exakt so
+   bleiben muss — siehe KOMMUNIKATION.md. */
+const rundreiseVorher = await page.evaluate(() => {
+  document.querySelectorAll("dialog").forEach(d=>d.close());
+  cfg.klasse = "RT-Klasse"; cfg.slots = [{std:"1",von:"08:00",bis:"09:30"}];
+  plan = {A:{},B:{}};
+  ["MO","DI","MI","DO","FR"].forEach(t => { plan.A[t]=[{fach:"RT",raum:"R1",lk:"L1"}]; plan.B[t]=[null]; });
+  eintraege = [{id:"rt1",typ:"H",fach:"RT",datum:iso(new Date()),titel:"Rundreise-Test",notiz:"x",erledigt:false,geloescht:false}];
+  ferien = [{von:iso(new Date()),bis:iso(new Date()),name:"RT-Ferien",typ:"eigen"}];
+  sonder = [{id:"rt2",datum:iso(new Date()),slot:0,art:"vertretung",titel:"RT-Sonder",raum:"R2",notiz:"y",geloescht:false}];
+  noten = [{id:"rt3",fach:"RT",art:"s",wert:2,datum:iso(new Date()),titel:"RT-Note",notiz:"z",geloescht:false}];
+  persistState(); normalize();
+  return sicherungsText();
+});
+await page.evaluate(() => {
+  cfg.klasse = "ANDERS"; plan = {A:{},B:{}}; eintraege = []; ferien = []; sonder = []; noten = [];
+  persistState();
+});
+await page.evaluate(() => { document.querySelectorAll("dialog").forEach(d=>d.close()); openSettings(); });
+await page.waitForTimeout(200);
+await page.fill("#sDaten", rundreiseVorher);
+await page.click("#sLaden"); await page.waitForTimeout(400);
+const rundreiseNachher = await page.evaluate(() => ({
+  klasse: cfg.klasse,
+  fach: (plan.A.MO && plan.A.MO[0] || {}).fach,
+  eintragTitel: (eintraege.find(e=>e.id==="rt1")||{}).titel,
+  ferienName: (ferien[0]||{}).name,
+  sonderTitel: (sonder.find(s=>s.id==="rt2")||{}).titel,
+  noteTitel: (noten.find(n=>n.id==="rt3")||{}).titel,
+}));
+pruef("Rundreise: cfg übersteht export/import", rundreiseNachher.klasse === "RT-Klasse", rundreiseNachher.klasse);
+pruef("Rundreise: plan übersteht export/import", rundreiseNachher.fach === "RT", JSON.stringify(rundreiseNachher.fach));
+pruef("Rundreise: eintraege übersteht export/import", rundreiseNachher.eintragTitel === "Rundreise-Test", rundreiseNachher.eintragTitel);
+pruef("Rundreise: ferien übersteht export/import", rundreiseNachher.ferienName === "RT-Ferien", rundreiseNachher.ferienName);
+pruef("Rundreise: sonder übersteht export/import", rundreiseNachher.sonderTitel === "RT-Sonder", rundreiseNachher.sonderTitel);
+pruef("Rundreise: noten übersteht export/import", rundreiseNachher.noteTitel === "RT-Note", rundreiseNachher.noteTitel);
+/* Aufräumen, damit die Rundreise-Daten (insbesondere „sonder") nicht in
+   die folgenden Prüfungen hineinwirken — allen voran den ICS-Export. */
+await page.evaluate(() => {
+  document.querySelectorAll("dialog").forEach(d=>d.close());
+  eintraege = []; ferien = []; sonder = []; noten = []; persistState();
+});
+
 /* Prototype-Pollution über Import */
 const proto = await page.evaluate(() => {
   const vorher = ({}).polluted;
