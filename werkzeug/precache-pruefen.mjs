@@ -7,9 +7,13 @@ const index = fs.readFileSync(path.join(root, "index.html"), "utf8");
 const app = fs.readFileSync(path.join(root, "app.js"), "utf8");
 
 function localPath(value) {
-  if (!value.startsWith("./")) return null;
+  if (/^(?:[a-z]+:|\\/|#)/i.test(value)) return null;
   const clean = value.split("#", 1)[0].split("?", 1)[0];
-  return clean === "./" ? "./index.html" : clean;
+  if (clean === "." || clean === "./") return "./index.html";
+  if (clean.startsWith("./")) return clean;
+  // HTML/JS references without ./ are relative to the application root.
+  if (/^[A-Za-z0-9._-]+(?:\\/[A-Za-z0-9._-]+)*\\.[A-Za-z0-9]{1,8}$/.test(clean)) return `./${clean}`;
+  return null;
 }
 
 function existsLocal(value) {
@@ -32,19 +36,17 @@ for (const match of dateienMatch[1].matchAll(/"([^"\\]*(?:\\.[^"\\]*)*)"|'([^'\\
 const used = new Set();
 for (const match of index.matchAll(/\b(?:src|href)\s*=\s*["']([^"']+)["']/gi)) add(used, match[1]);
 
-// Check explicit local resource strings in application code. The service
-// worker itself is intentionally network-fetched for version checks and is
-// therefore not required to be listed in DATEIEN.
-for (const match of app.matchAll(/["'`]((?:\.\/)[^"'`\s?#]+(?:\.[a-z0-9]{1,8})(?:[?#][^"'`\s]*)?)["'`]/gi)) {
-  const value = match[1];
-  if (value !== "./sw.js") add(used, value);
+// Only inspect resource-taking calls in application code. The service worker
+// itself is intentionally network-fetched for version checks and is therefore
+// not required to be listed in DATEIEN.
+const resourceCall = /\b(?:fetch|import|register)\s*\(\s*["'`]([^"'`]+)["'`]/g;
+for (const match of app.matchAll(resourceCall)) {
+  if (match[1] !== "./sw.js" && match[1] !== "sw.js") add(used, match[1]);
 }
+for (const match of app.matchAll(/\bnew\s+URL\s*\(\s*["'`]([^"'`]+)["'`]/g)) add(used, match[1]);
 
-const missingFiles = [];
-for (const file of new Set([...precache, ...used])) {
-  if (!existsLocal(file)) missingFiles.push(file);
-}
-
+const allReferenced = new Set([...precache, ...used]);
+const missingFiles = [...allReferenced].filter(file => !existsLocal(file));
 const missingPrecache = [...used].filter(file => !precache.has(file));
 const stalePrecache = [...precache].filter(file => !existsLocal(file));
 
