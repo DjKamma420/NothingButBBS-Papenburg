@@ -187,7 +187,7 @@ loadProfiles();
 const profilName = () => (profile.find(x => x.id === profilId) || {}).name || "Profil";
 
 let cfg, plan, eintraege, ferien, sonder, noten;
-function zustandLaden(){
+function loadState(){
   Speicher.puffer = {};
   cfg       = Object.assign({}, STANDARD, Speicher.lies("cfg", {}));
   plan      = Speicher.lies("plan", {});
@@ -227,7 +227,7 @@ function merkblattUmziehen(){
     Speicher.schreib("eintraege", eintraege);
   }
 }
-zustandLaden();
+loadState();
 
 let ansicht = "tag", einSub = null, bearbeiten = false;
 let gewaehlt = new Date(), kalMonat = new Date(), kalTag = new Date();
@@ -449,14 +449,14 @@ function render(){
   const punkte = $("#wischPunkte");
   if(punkte) [...punkte.children].forEach((p,i) => p.classList.toggle("an", ANSICHTEN[i] === ansicht));
   try{
-    if(ansicht === "tag") zeichneTag();
-    else if(ansicht === "kalender") zeichneKalender();
-    else if(ansicht === "zeugnis") zeichneZeugnis();
-    else zeichneEintraege();
+    if(ansicht === "tag") renderDay();
+    else if(ansicht === "kalender") renderCalendar();
+    else if(ansicht === "zeugnis") renderReportCard();
+    else renderEntries();
   }catch(e){ showError("Ansicht \u201e"+ansicht+"\u201c: "+e.message, (e.stack||"").split("\n")[1]||""); }
 }
 
-function zeichneTag(){
+function renderDay(){
   const idx = tagIndex(gewaehlt), woche = wocheFuer(gewaehlt);
   document.body.classList.toggle("bearbeiten", bearbeiten);
   $("#btnEdit").setAttribute("aria-pressed", bearbeiten);
@@ -545,9 +545,9 @@ function zeichneTag(){
       teile.push(`<div class="schluss">Schluss nach ${esc(cfg.slots[bis-1].bis)}</div>`);
     $("#plan").innerHTML = teile.join("");
   }
-  zeichneFortschritt();
+  renderProgress();
   sicherungBanner();
-  zeichneListe("#tagListe", "#tagNix", eintraegeAm(gewaehlt));
+  renderList("#tagListe", "#tagNix", eintraegeAm(gewaehlt));
 }
 
 /* Das README verspricht eine Erinnerung nach vier Wochen. Sie stand bisher
@@ -622,7 +622,7 @@ function jetztLinie(bis){
     if(j >= minuten(cfg.slots[i].bis) && j < minuten(cfg.slots[i+1].von)) return i+1;
   return bis;
 }
-function zeichneFortschritt(){
+function renderProgress(){
   const box = $("#fortschritt");
   if(!istHeuteSchultag()){ box.classList.add("hidden"); return; }
   box.classList.remove("hidden");
@@ -673,7 +673,7 @@ function countdownText(){
   return "";
 }
 
-function zeichneListe(sel, nixSel, liste, mitNotiz = true){
+function renderList(sel, nixSel, liste, mitNotiz = true){
   $(sel).innerHTML = liste.map(e => {
     const d = new Date(e.datum + "T12:00");
     const abhakbar = e.typ === "H" || e.typ === "K" || e.typ === "N";
@@ -690,7 +690,7 @@ function zeichneListe(sel, nixSel, liste, mitNotiz = true){
   $(nixSel).hidden = liste.length > 0;
 }
 
-function zeichneKalender(){
+function renderCalendar(){
   $("#monatLabel").textContent = kalMonat.toLocaleDateString("de-DE",{month:"long",year:"numeric"});
   const start = mondayOf(new Date(kalMonat.getFullYear(), kalMonat.getMonth(), 1));
   let html = ["Mo","Di","Mi","Do","Fr","Sa","So"].map(t => `<div class="wt">${t}</div>`).join("");
@@ -709,7 +709,7 @@ function zeichneKalender(){
   const frei = freiAm(kalTag);
   $("#kalFerien").classList.toggle("hidden", !frei);
   if(frei) $("#kalFerien").textContent = frei.name + (frei.typ === "feiertag" ? " · Feiertag" : " · Ferien");
-  zeichneListe("#kalListe", "#kalNix", eintraegeAm(kalTag), false);
+  renderList("#kalListe", "#kalNix", eintraegeAm(kalTag), false);
   const ev = sonderTag(kalTag);
   if(ev.length){
     $("#kalListe").insertAdjacentHTML("afterbegin", ev.map(o => `<li>
@@ -766,7 +766,7 @@ function archivHinweis(liste){
 const archivFinden = (art,id) => art === "eintrag" ? eintraege.find(x => x.id === id)
   : art === "ereignis" ? sonder.find(x => x.id === id) : noten.find(x => x.id === id);
 
-function zeichneEintraege(){
+function renderEntries(){
   $("#einMenu").classList.toggle("hidden", einSub !== null);
   $("#einDetail").classList.toggle("hidden", einSub === null);
   $("#einSubHinweis").textContent = "";
@@ -832,17 +832,17 @@ function zeichneEintraege(){
     $("#einNix").hidden = liste.length > 0;
     return;
   }
-  if(einSub === "G"){ zeichneNoten(); return; }
-  if(einSub === "M"){ zeichneMerk(); return; }
-  if(einSub === "F"){ zeichneFehlzeiten(); return; }
+  if(einSub === "G"){ renderGrades(); return; }
+  if(einSub === "M"){ renderHandouts(); return; }
+  if(einSub === "F"){ renderAbsences(); return; }
 
   const liste = listeVonTyp(einSub);
-  zeichneListe("#einListe", "#einNix", liste);
+  renderList("#einListe", "#einNix", liste);
   $("#einNix").textContent = {H:"Keine offenen Hausaufgaben.",K:"Keine Klausuren eingetragen.",
                               N:"Keine Notizen."}[einSub] || "Nichts vorhanden.";
 }
 
-function zeichneNoten(){
+function renderGrades(){
   $("#einSubHinweis").textContent =
     `Verhältnis je Fach antippbar. Standard: ${Number(cfg.anteilM)||0} % mündlich.`;
   const liste = alleFaecher().filter(f => notenAktiv().some(n => n.fach === f));
@@ -867,7 +867,7 @@ function zeichneNoten(){
   $("#einNix").hidden = liste.length > 0;
 }
 
-function zeichneMerk(){
+function renderHandouts(){
   const liste = listeVonTyp("M");
   $("#einSubHinweis").textContent = "Antippen zum Ansehen.";
   let letztesFach = null;
@@ -903,7 +903,7 @@ function errorText(){
   return `${zahl(g,"Stunde","Stunden")} = ${tageText(g)}`
        + (u ? ` · davon ${u} unentschuldigt` : "");
 }
-function zeichneFehlzeiten(){
+function renderAbsences(){
   const liste = listeVonTyp("F");
   $("#einSubHinweis").textContent = errorText();
   $("#einListe").innerHTML = liste.map(e => `<li>
@@ -923,7 +923,7 @@ function fachReihenfolge(){
   const wunsch = Array.isArray(cfg.reiheFach) ? cfg.reiheFach : [];
   return [...wunsch.filter(f => alle.includes(f)), ...alle.filter(f => !wunsch.includes(f))];
 }
-function zeichneZeugnis(){
+function renderReportCard(){
   const liste = fachReihenfolge();
   const schnitte = liste.map(f => gradeAverage(f).gesamt).filter(w => w !== null);
   const gesamt = schnitte.length ? schnitte.reduce((a,b) => a+b, 0)/schnitte.length : null;
@@ -949,16 +949,16 @@ function zeichneZeugnis(){
    Navigation
    ===================================================================== */
 const ANSICHTEN = ["tag","kalender","eintraege","zeugnis"];
-function zeigeAnsicht(a){
+function showView(a){
   ansicht = a;
   if(a === "kalender"){ kalMonat = new Date(gewaehlt); kalTag = new Date(gewaehlt); }
   if(a === "eintraege") einSub = null;
   render();
 }
-$("#rTag").onclick = () => zeigeAnsicht("tag");
-$("#rKal").onclick = () => zeigeAnsicht("kalender");
-$("#rEin").onclick = () => zeigeAnsicht("eintraege");
-$("#rZeu").onclick = () => zeigeAnsicht("zeugnis");
+$("#rTag").onclick = () => showView("tag");
+$("#rKal").onclick = () => showView("kalender");
+$("#rEin").onclick = () => showView("eintraege");
+$("#rZeu").onclick = () => showView("zeugnis");
 $("#btnEdit").onclick = () => { bearbeiten = !bearbeiten; render(); };
 $("#btnHeute").onclick = () => { gewaehlt = new Date(); render(); };
 $("#wocheZurueck").onclick = () => { gewaehlt = plusTage(gewaehlt,-7); render(); };
@@ -1008,14 +1008,14 @@ wischen($("#ansichtEin"), () => { if(einSub !== null){ einSub = null; render(); 
 const ansichtWisch = r => {
   if(ansicht === "eintraege" && einSub !== null){ einSub = null; render(); return; }
   const i = ANSICHTEN.indexOf(ansicht);
-  zeigeAnsicht(ANSICHTEN[(i + r + ANSICHTEN.length) % ANSICHTEN.length]);
+  showView(ANSICHTEN[(i + r + ANSICHTEN.length) % ANSICHTEN.length]);
 };
 wischen($("#fuss"), ansichtWisch);
 wischen($("#leerraum"), ansichtWisch);
 $("#wischPunkte").onclick = () => {
   if(ansicht === "eintraege" && einSub !== null){ einSub = null; render(); return; }
   const i = ANSICHTEN.indexOf(ansicht);
-  zeigeAnsicht(ANSICHTEN[(i+1) % ANSICHTEN.length]);
+  showView(ANSICHTEN[(i+1) % ANSICHTEN.length]);
 };
 /* Tippen neben den Inhalt einer Unterliste führt zurück */
 $("#ansichtEin").addEventListener("click", e => {
@@ -1274,9 +1274,9 @@ const freiUmschalten = () => $("#eFachFreiWrap").classList.toggle("hidden", eFac
 const aktuellesFach = () => (eFach.value === "__frei" ? eFachFrei.value : eFach.value).trim().toUpperCase();
 eFach.onchange = () => {
   freiUmschalten();
-  if(!$("#eDatumWahl").classList.contains("hidden")) zeichneDatumWahl();
+  if(!$("#eDatumWahl").classList.contains("hidden")) renderDatePicker();
 };
-eFachFrei.oninput = () => { if(!$("#eDatumWahl").classList.contains("hidden")) zeichneDatumWahl(); };
+eFachFrei.oninput = () => { if(!$("#eDatumWahl").classList.contains("hidden")) renderDatePicker(); };
 eTyp.onchange = toggleType;
 
 function stundenAuswahlFuellen(slot){
@@ -1309,7 +1309,7 @@ function dateFieldText(){
     ? new Date(v+"T12:00").toLocaleDateString("de-DE",{weekday:"short",day:"2-digit",month:"2-digit",year:"numeric"})
     : "—";
 }
-function zeichneDatumWahl(){
+function renderDatePicker(){
   const fach = aktuellesFach();
   $("#eMonatLabel").textContent = eMonat.toLocaleDateString("de-DE",{month:"long",year:"numeric"});
   const start = mondayOf(new Date(eMonat.getFullYear(), eMonat.getMonth(), 1));
@@ -1329,11 +1329,11 @@ function zeichneDatumWahl(){
 function datumWahlOeffnen(auf){
   $("#eDatumWahl").classList.toggle("hidden", !auf);
   $("#eDatumFeld").setAttribute("aria-expanded", auf ? "true" : "false");
-  if(auf){ eMonat = new Date((eDatum.value || iso(new Date()))+"T12:00"); zeichneDatumWahl(); }
+  if(auf){ eMonat = new Date((eDatum.value || iso(new Date()))+"T12:00"); renderDatePicker(); }
 }
 $("#eDatumFeld").onclick = () => datumWahlOeffnen($("#eDatumWahl").classList.contains("hidden"));
-$("#eMonatMinus").onclick = () => { eMonat = new Date(eMonat.getFullYear(), eMonat.getMonth()-1, 1); zeichneDatumWahl(); };
-$("#eMonatPlus").onclick  = () => { eMonat = new Date(eMonat.getFullYear(), eMonat.getMonth()+1, 1); zeichneDatumWahl(); };
+$("#eMonatMinus").onclick = () => { eMonat = new Date(eMonat.getFullYear(), eMonat.getMonth()-1, 1); renderDatePicker(); };
+$("#eMonatPlus").onclick  = () => { eMonat = new Date(eMonat.getFullYear(), eMonat.getMonth()+1, 1); renderDatePicker(); };
 $("#eGitter").onclick = e => {
   const b = e.target.closest("[data-wahl]"); if(!b) return;
   eDatum.value = b.dataset.wahl; dateFieldText(); datumWahlOeffnen(false);
@@ -1378,7 +1378,7 @@ function bildVerkleinern(datei, fertig){
 }
 
 /* --- Öffnen --- */
-function standardArt(){
+function defaultType(){
   if(ansicht === "eintraege" && einSub && ARTLANG[einSub] && einSub !== "archiv") return einSub;
   if(ansicht === "zeugnis") return "G";
   return "H";
@@ -1394,7 +1394,7 @@ function eintragOeffnen(e, datum, typ, fach, slot, extra){
   if(vorhanden){ ereignisId = vorhanden.id; ereignisArt = vorhanden.art || "ereignis"; }
 
   $("#dlgEintragTitel").textContent = (e || vorhanden) ? "Eintrag ändern" : "Neuer Eintrag";
-  eTyp.value = e ? e.typ : (typ || standardArt());
+  eTyp.value = e ? e.typ : (typ || defaultType());
   eDatum.value = e ? e.datum : iso(d);
   eText.value = e ? (e.titel || "") : (vorhanden ? vorhanden.titel : (ereignisArt === "vertretung" ? "Vertretung" : ""));
   eNotiz.value = e ? (e.notiz || "") : (vorhanden ? (vorhanden.notiz || "") : "");
@@ -1725,7 +1725,7 @@ function profileButton(){
   el.setAttribute("aria-label", "Profil: " + profilName());
 }
 let profilVerwalten = false, profilManuell = false;
-function zeichneProfilAuswahl(){
+function renderProfileSelect(){
   $("#pFrage").textContent = profilVerwalten ? "Profile verwalten" : "Wer bist du?";
   $("#pVerwalten").textContent = profilVerwalten ? "Fertig" : "Verwalten";
   $("#pZurueck").classList.toggle("hidden", !profilManuell || profilVerwalten);
@@ -1745,20 +1745,20 @@ function zeichneProfilAuswahl(){
 }
 function profilAuswahlZeigen(manuell){
   profilManuell = !!manuell; profilVerwalten = false;
-  zeichneProfilAuswahl();
+  renderProfileSelect();
   $("#profilStart").classList.remove("hidden");
 }
 const profilAuswahlSchliessen = () => { $("#profilStart").classList.add("hidden"); profilVerwalten = false; };
 $("#btnProfil").onclick = () => profilAuswahlZeigen(true);
 $("#pZurueck").onclick = profilAuswahlSchliessen;
-$("#pVerwalten").onclick = () => { profilVerwalten = !profilVerwalten; zeichneProfilAuswahl(); };
+$("#pVerwalten").onclick = () => { profilVerwalten = !profilVerwalten; renderProfileSelect(); };
 $("#pGitter").onclick = e => {
   if(e.target.closest("#kachelNeu")){
     const name = prompt("Name des neuen Profils", "Profil " + (profile.length+1));
     if(!name || !name.trim()) return;
     const id = createId();
     profile.push({id, name:name.trim()}); profilId = id; saveProfiles();
-    zustandLaden(); normalize(); persistState();
+    loadState(); normalize(); persistState();
     profilVerwalten = false; profileButton(); ansicht = "tag";
     profilAuswahlSchliessen(); render(); return;
   }
@@ -1766,7 +1766,7 @@ $("#pGitter").onclick = e => {
   if(u){
     const x = profile.find(y => y.id === u.dataset.umbenennen);
     const name = prompt("Neuer Name", x.name);
-    if(name && name.trim()){ x.name = name.trim(); saveProfiles(); zeichneProfilAuswahl(); profileButton(); }
+    if(name && name.trim()){ x.name = name.trim(); saveProfiles(); renderProfileSelect(); profileButton(); }
     return;
   }
   const d = e.target.closest("[data-profilweg]");
@@ -1775,13 +1775,13 @@ $("#pGitter").onclick = e => {
     if(!confirm(`Profil \u201e${x.name}\u201c mit allen Daten löschen? Das lässt sich nicht rückgängig machen.`)) return;
     profilSchluessel(x.id).forEach(k => { try{ localStorage.removeItem(k); }catch(e){} });
     profile = profile.filter(y => y.id !== x.id);
-    if(profilId === x.id){ profilId = profile[0].id; zustandLaden(); normalize(); }
-    saveProfiles(); profileButton(); zeichneProfilAuswahl(); render(); return;
+    if(profilId === x.id){ profilId = profile[0].id; loadState(); normalize(); }
+    saveProfiles(); profileButton(); renderProfileSelect(); render(); return;
   }
   const w = e.target.closest("[data-wechsel]");
   if(w && !profilVerwalten){
     profilId = w.dataset.wechsel; saveProfiles();
-    zustandLaden(); normalize(); profileButton();
+    loadState(); normalize(); profileButton();
     ansicht = "tag"; einSub = null; gewaehlt = new Date();
     profilAuswahlSchliessen(); render();
   }
@@ -3001,7 +3001,7 @@ function einstellungenOeffnen(){
   $("#sWocheKopieren").classList.toggle("hidden", !cfg.zweiWochen);
   $("#sWocheStand").textContent = "";
   $("#sDateiAlle").classList.toggle("hidden", profile.length < 2);
-  sicherungStand(); speicherStand(); versionPruefen();
+  sicherungStand(); speicherStand(); checkVersion();
   dlgEinst.showModal();
 }
 $("#btnEinst").onclick = einstellungenOeffnen;
@@ -3131,7 +3131,7 @@ function alleProfileUebernehmen(liste){
   vorher.filter(id => !neu.some(x => x.id === id))
     .forEach(id => profilSchluessel(id).forEach(k => { try{ localStorage.removeItem(k); }catch(e){} }));
   profile = neu; profilId = neu[0].id; saveProfiles();
-  zustandLaden(); normalize(); persistState(); profileButton();
+  loadState(); normalize(); persistState(); profileButton();
   ansicht = "tag"; einSub = null; dlgEinst.close(); render();
 }
 $("#sLaden").onclick = () => {
@@ -3169,7 +3169,7 @@ $("#sReset").onclick = () => {
   normalize(); persistState(); dlgEinst.close(); render();
 };
 $("#sUpdate").onclick = async () => {
-  const s = await versionPruefen();
+  const s = await checkVersion();
   if(s && s.veraltet) checkForUpdate();
   else alert("Du bist auf dem neuesten Stand" + (s && s.laeuft ? " (" + s.laeuft + ")." : "."));
 };
@@ -3232,7 +3232,7 @@ async function serverVersionText(){
     return m ? m[1] : null;
   }catch(e){ return null; }
 }
-async function versionPruefen(){
+async function checkVersion(){
   const [laeuft, server] = await Promise.all([currentVersion(), serverVersionText()]);
   BUILD = laeuft || server || "—";
   const veraltet = laeuft && server && laeuft !== server;
@@ -3271,7 +3271,7 @@ let letzterTag = iso(new Date());
 setInterval(() => {
   const jetzt = iso(new Date());
   if(jetzt !== letzterTag){ letzterTag = jetzt; gewaehlt = new Date(); render(); }
-  else if(ansicht === "tag") { zeichneFortschritt(); $("#countdown").textContent = countdownText(); }
+  else if(ansicht === "tag") { renderProgress(); $("#countdown").textContent = countdownText(); }
 }, 30000);
 document.addEventListener("visibilitychange", () => { if(!document.hidden) render(); });
 /* Zwei offene Tabs auf demselben Profil schrieben sich bisher gegenseitig
@@ -3281,7 +3281,7 @@ window.addEventListener("storage", e => {
   if(e.key === "profile" || e.key === "profilAktiv"){ location.reload(); return; }
   const vorne = "p" + profilId + "_";
   if(!e.key.startsWith(vorne) || !DATEN.includes(e.key.slice(vorne.length))) return;
-  zustandLaden(); normalize(); render();
+  loadState(); normalize(); render();
 });
 
 /* Ohne <dialog> läuft hier fast nichts: jeder Eintrag, jede Einstellung
@@ -3309,7 +3309,7 @@ function initApp(){
   normalize();
   profileButton();
   render();
-  versionPruefen();
+  checkVersion();
   meldemerkerAufraeumen();
   erinnerungenPruefen().catch(() => {});
   autoSicherung().catch(() => {});
